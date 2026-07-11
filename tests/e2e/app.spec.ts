@@ -19,7 +19,9 @@ test('opens the calendar level and launches the ball', async ({ page }) => {
   await expect(canvas).toHaveAttribute('data-scene', 'GameScene');
   await expect(canvas).toHaveAttribute('data-calendar-ready', 'true');
   await expect(canvas).toHaveAttribute('data-meeting-count', '21');
+  await expect(canvas).toHaveAttribute('data-coffee-cups', '3');
   await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
+  await expect(page.getByLabel('Игровая статистика')).toBeVisible();
 
   await page.keyboard.down('Space');
   await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
@@ -66,4 +68,67 @@ test('supports keyboard movement, mouse movement and click launch', async ({
   await page.mouse.down({ button: 'left' });
   await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
   await page.mouse.up({ button: 'left' });
+});
+
+test('coffee defeat supports exit, a new game and restart', async ({ page }) => {
+  await page.goto('/');
+
+  const canvas = page.locator('canvas');
+
+  const playUntilDefeat = async (verifyScore: boolean) => {
+    await canvas.scrollIntoViewIfNeeded();
+    const bounds = await canvas.boundingBox();
+    expect(bounds).not.toBeNull();
+
+    if (!bounds) {
+      return;
+    }
+
+    await page.mouse.move(
+      bounds.x + bounds.width * 0.36,
+      bounds.y + bounds.height * 0.8,
+    );
+    await page.mouse.move(
+      bounds.x + bounds.width * 0.33,
+      bounds.y + bounds.height * 0.8,
+      { steps: 3 },
+    );
+
+    for (const coffeeCups of [2, 1, 0]) {
+      await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
+      await page.keyboard.down('Space');
+      await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
+      await page.keyboard.up('Space');
+      await expect(canvas).toHaveAttribute(
+        'data-coffee-cups',
+        coffeeCups.toString(),
+        { timeout: 6_000 },
+      );
+    }
+
+    await expect(canvas).toHaveAttribute('data-ball-state', 'game-over');
+    await expect(page.getByRole('dialog')).toBeVisible();
+    await expect(page.getByText('Кофе закончился', { exact: true })).toBeVisible();
+    await expect(page.getByText('Встречи победили.', { exact: true })).toBeVisible();
+    if (verifyScore) {
+      await expect
+        .poll(async () => Number(await canvas.getAttribute('data-score')))
+        .toBeGreaterThan(0);
+    }
+  };
+
+  await playUntilDefeat(true);
+  await page.getByRole('button', { name: 'Закончить рабочий день' }).click();
+  await expect(
+    page.getByRole('button', { name: 'Начать работу' }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Начать работу' }).click();
+  await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
+  await expect(canvas).toHaveAttribute('data-coffee-cups', '3');
+
+  await playUntilDefeat(false);
+  await page.getByRole('button', { name: 'Заварить заново' }).click();
+  await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
+  await expect(canvas).toHaveAttribute('data-coffee-cups', '3');
 });

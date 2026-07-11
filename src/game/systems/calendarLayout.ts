@@ -9,9 +9,9 @@ export const CALENDAR_STEP_MINUTES = 30;
 
 export const DEFAULT_CALENDAR_LAYOUT: CalendarLayout = {
   x: 100,
-  y: 78,
+  y: 92,
   width: 1080,
-  height: 468,
+  height: 454,
   startMinutes: 9 * 60,
   endMinutes: 18 * 60,
   columnGap: 6,

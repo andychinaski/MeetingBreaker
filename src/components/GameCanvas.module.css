@@ -1,9 +1,49 @@
 .gameFrame {
+  position: relative;
   overflow: hidden;
   border: 1px solid var(--color-border);
   border-radius: 20px;
   background: var(--color-surface);
   box-shadow: var(--shadow-card);
+}
+
+.exitMenu {
+  position: absolute;
+  z-index: 45;
+  inset: 0 0 46px;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  padding: 24px;
+  background: rgb(2 6 23 / 88%);
+  backdrop-filter: blur(9px);
+}
+
+.exitMenu p {
+  margin: 0 0 6px;
+  color: var(--color-accent);
+  font-size: 0.7rem;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.exitMenu h2 {
+  margin: 0;
+  color: var(--color-text);
+  font-size: clamp(2rem, 5vw, 4rem);
+  letter-spacing: -0.05em;
+}
+
+.exitMenu button {
+  margin-top: 20px;
+  padding: 12px 22px;
+  border: 0;
+  border-radius: 10px;
+  color: #082f49;
+  background: var(--color-accent);
+  font-weight: 900;
+  cursor: pointer;
 }
 
 .canvasContainer {

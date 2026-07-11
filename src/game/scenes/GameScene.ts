@@ -15,6 +15,18 @@ import { CalendarGrid } from '../objects/CalendarGrid';
 import { MeetingBlock } from '../objects/MeetingBlock';
 import { Paddle } from '../objects/Paddle';
 import {
+  GAME_COMMANDS,
+  GAME_EVENTS,
+  GAME_STATE_REGISTRY_KEY,
+  type CoffeeChangedPayload,
+  type CoffeeConsumedPayload,
+  type GameOverPayload,
+  type GameStartedPayload,
+  type LevelCompletedPayload,
+  type MeetingDestroyedPayload,
+  type ScoreChangedPayload,
+} from '../events/gameEvents';
+import {
   accelerateVelocity,
   calculatePaddleBounce,
   hasRepeatingImpacts,
@@ -26,6 +38,19 @@ import {
   calculateMeetingRect,
   DEFAULT_CALENDAR_LAYOUT,
 } from '../systems/calendarLayout';
+import { CoffeeSystem } from '../systems/CoffeeSystem';
+import { LevelProgress } from '../systems/LevelProgress';
+import { ScoreSystem } from '../systems/ScoreSystem';
+import type { GameState, GameStatus } from '../types/game';
+
+const COFFEE_LOSS_MESSAGES: string[] = [
+  'Задача потеряна. Пора за кофе.',
+  'Без кофе это уже не починить.',
+  'Ещё одна чашка — и продолжаем.',
+  'Фокус закончился. Кофе ещё есть.',
+  'Небольшой перерыв у кофемашины.',
+  'Продолжаем на кофеине.',
+];
 
 export class GameScene extends Phaser.Scene {
   private paddle!: Paddle;
@@ -40,24 +65,35 @@ export class GameScene extends Phaser.Scene {
   private loopNudgeDirection: HorizontalDirection = 1;
   private readonly recentPaddleImpacts: number[] = [];
   private readonly meetingBlocks: MeetingBlock[] = [];
+  private scoreSystem!: ScoreSystem;
+  private coffeeSystem!: CoffeeSystem;
+  private levelProgress!: LevelProgress;
+  private gameStatus: GameStatus = 'idle';
 
   constructor() {
     super('GameScene');
   }
 
   create(): void {
+    this.initializeGameState();
     this.drawBounds();
     this.configureWorld();
     this.createCalendar();
     this.createObjects();
     this.configureInput();
     this.configureCollisions();
+    this.configureGameEvents();
 
     this.setCanvasState('ready');
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupInput, this);
+    this.publishGameStarted();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupScene, this);
   }
 
   update(_time: number, delta: number): void {
+    if (this.gameStatus !== 'playing') {
+      return;
+    }
+
     this.updateKeyboardMovement(delta);
 
     if (!this.ballLaunched) {
@@ -79,6 +115,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private configureWorld(): void {
+    this.physics.resume();
     this.physics.world.setBounds(
       WORLD_PADDING,
       WORLD_PADDING,
@@ -92,6 +129,17 @@ export class GameScene extends Phaser.Scene {
     this.paddle = new Paddle(this, GAME_WIDTH / 2, PADDLE_Y);
     this.ball = new Ball(this, GAME_WIDTH / 2, PADDLE_Y - 48);
     this.ball.resetOnPaddle(this.paddle);
+  }
+
+  private initializeGameState(): void {
+    this.scoreSystem = new ScoreSystem();
+    this.coffeeSystem = new CoffeeSystem(DEFAULT_LEVEL.initialCoffeeCups);
+    this.levelProgress = new LevelProgress(
+      DEFAULT_LEVEL.meetings
+        .filter((meeting) => meeting.required ?? true)
+        .map((meeting) => meeting.id),
+    );
+    this.gameStatus = 'playing';
   }
 
   private createCalendar(): void {
@@ -147,6 +195,19 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  private configureGameEvents(): void {
+    this.game.events.on(
+      GAME_EVENTS.MEETING_DESTROYED,
+      this.handleMeetingDestroyed,
+      this,
+    );
+    this.game.events.on(
+      GAME_COMMANDS.RESTART_LEVEL,
+      this.handleRestartLevel,
+      this,
+    );
+  }
+
   private updateKeyboardMovement(delta: number): void {
     const movingLeft = this.leftKey.isDown || this.cursors.left.isDown;
     const movingRight = this.rightKey.isDown || this.cursors.right.isDown;
@@ -186,7 +247,11 @@ export class GameScene extends Phaser.Scene {
   }
 
   private launchBall(): void {
-    if (this.ballLaunched || this.resettingBall) {
+    if (
+      this.gameStatus !== 'playing' ||
+      this.ballLaunched ||
+      this.resettingBall
+    ) {
       return;
     }
 
@@ -236,10 +301,14 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.ball.setSafeVelocity(nextVelocity, this.launchDirection);
+
+    if (this.scoreSystem.snapshot.combo > 0) {
+      this.publishScore(this.scoreSystem.resetCombo());
+    }
   }
 
   private handleBallLost(): void {
-    if (this.resettingBall) {
+    if (this.gameStatus !== 'playing' || this.resettingBall) {
       return;
     }
 
@@ -250,11 +319,125 @@ export class GameScene extends Phaser.Scene {
     this.launchDirection = this.launchDirection === 1 ? -1 : 1;
     this.setCanvasState('resetting');
 
+    if (this.scoreSystem.snapshot.combo > 0) {
+      this.publishScore(this.scoreSystem.resetCombo());
+    }
+
+    const coffeeResult = this.coffeeSystem.consume();
+    const coffeePayload: CoffeeChangedPayload = {
+      coffeeCups: coffeeResult.coffeeCups,
+      initialCoffeeCups: this.coffeeSystem.initialCoffeeCups,
+    };
+    const consumedPayload: CoffeeConsumedPayload = {
+      ...coffeePayload,
+      message: Phaser.Utils.Array.GetRandom(COFFEE_LOSS_MESSAGES),
+    };
+    this.updateRegistryState();
+    this.game.events.emit(GAME_EVENTS.COFFEE_CONSUMED, consumedPayload);
+    this.game.events.emit(GAME_EVENTS.COFFEE_CHANGED, coffeePayload);
+    this.game.canvas.dataset.coffeeCups = coffeeResult.coffeeCups.toString();
+
+    if (coffeeResult.empty) {
+      this.finishWithDefeat();
+      return;
+    }
+
     this.time.delayedCall(BALL_RESET_DELAY_MS, () => {
+      if (this.gameStatus !== 'playing') {
+        return;
+      }
       this.ball.resetOnPaddle(this.paddle);
       this.resettingBall = false;
       this.setCanvasState('ready');
     });
+  }
+
+  private readonly handleMeetingDestroyed = (
+    payload: MeetingDestroyedPayload,
+  ): void => {
+    if (this.gameStatus !== 'playing') {
+      return;
+    }
+
+    this.publishScore(this.scoreSystem.registerMeetingDestroyed(payload));
+    const completedNow = this.levelProgress.registerDestroyed(
+      payload.meetingId,
+      payload.required,
+    );
+    this.game.canvas.dataset.requiredMeetings =
+      this.levelProgress.remainingRequired.toString();
+
+    if (completedNow) {
+      this.finishWithVictory();
+    }
+  };
+
+  private readonly handleRestartLevel = (): void => {
+    this.scene.restart();
+  };
+
+  private finishWithVictory(): void {
+    this.gameStatus = 'won';
+    this.stopGameplay('level-completed');
+    const payload: LevelCompletedPayload = {
+      result: this.scoreSystem.createLevelResult(
+        this.coffeeSystem.coffeeSpent,
+      ),
+    };
+    this.updateRegistryState();
+    this.game.events.emit(GAME_EVENTS.LEVEL_COMPLETED, payload);
+  }
+
+  private finishWithDefeat(): void {
+    this.gameStatus = 'lost';
+    this.stopGameplay('game-over');
+    const payload: GameOverPayload = {
+      result: this.scoreSystem.createLevelResult(
+        this.coffeeSystem.coffeeSpent,
+      ),
+    };
+    this.updateRegistryState();
+    this.game.events.emit(GAME_EVENTS.GAME_OVER, payload);
+  }
+
+  private stopGameplay(state: 'level-completed' | 'game-over'): void {
+    this.ballLaunched = false;
+    this.resettingBall = false;
+    this.ball.hideForReset();
+    this.physics.pause();
+    this.setCanvasState(state);
+    this.game.canvas.dataset.gameOutcome = this.gameStatus;
+  }
+
+  private publishGameStarted(): void {
+    const payload: GameStartedPayload = {
+      levelId: DEFAULT_LEVEL.id,
+      levelTitle: DEFAULT_LEVEL.title,
+      score: this.scoreSystem.snapshot,
+      coffeeCups: this.coffeeSystem.coffeeCups,
+      initialCoffeeCups: this.coffeeSystem.initialCoffeeCups,
+    };
+    this.updateRegistryState();
+    this.game.events.emit(GAME_EVENTS.GAME_STARTED, payload);
+  }
+
+  private publishScore(score: ScoreChangedPayload): void {
+    this.updateRegistryState();
+    this.game.events.emit(GAME_EVENTS.SCORE_CHANGED, score);
+  }
+
+  private updateRegistryState(): void {
+    const state: GameState = {
+      ...this.scoreSystem.snapshot,
+      coffeeCups: this.coffeeSystem.coffeeCups,
+      initialCoffeeCups: this.coffeeSystem.initialCoffeeCups,
+      activePowerUps: [],
+      status: this.gameStatus,
+    };
+    this.game.registry.set(GAME_STATE_REGISTRY_KEY, state);
+    this.game.canvas.dataset.score = state.score.toString();
+    this.game.canvas.dataset.freedMinutes = state.freedMinutes.toString();
+    this.game.canvas.dataset.combo = state.combo.toString();
   }
 
   private drawBounds(): void {
@@ -268,13 +451,24 @@ export class GameScene extends Phaser.Scene {
     graphics.strokePath();
   }
 
-  private setCanvasState(state: 'ready' | 'launched' | 'resetting'): void {
+  private setCanvasState(
+    state:
+      | 'ready'
+      | 'launched'
+      | 'resetting'
+      | 'level-completed'
+      | 'game-over',
+  ): void {
     this.game.canvas.dataset.ballState = state;
     this.game.canvas.dataset.scene = this.scene.key;
     this.game.canvas.dataset.paddleX = Math.round(this.paddle.x).toString();
+    this.game.canvas.dataset.coffeeCups =
+      this.coffeeSystem.coffeeCups.toString();
+    this.game.canvas.dataset.requiredMeetings =
+      this.levelProgress.remainingRequired.toString();
   }
 
-  private cleanupInput(): void {
+  private cleanupScene(): void {
     this.game.canvas.removeEventListener(
       'pointermove',
       this.handleCanvasPointerMove,
@@ -283,10 +477,26 @@ export class GameScene extends Phaser.Scene {
       'pointerdown',
       this.handleCanvasPointerDown,
     );
+    this.game.events.off(
+      GAME_EVENTS.MEETING_DESTROYED,
+      this.handleMeetingDestroyed,
+      this,
+    );
+    this.game.events.off(
+      GAME_COMMANDS.RESTART_LEVEL,
+      this.handleRestartLevel,
+      this,
+    );
     delete this.game.canvas.dataset.ballState;
     delete this.game.canvas.dataset.calendarReady;
     delete this.game.canvas.dataset.meetingCount;
     delete this.game.canvas.dataset.paddleX;
+    delete this.game.canvas.dataset.coffeeCups;
+    delete this.game.canvas.dataset.combo;
+    delete this.game.canvas.dataset.freedMinutes;
+    delete this.game.canvas.dataset.gameOutcome;
+    delete this.game.canvas.dataset.requiredMeetings;
+    delete this.game.canvas.dataset.score;
     delete this.game.canvas.dataset.scene;
   }
 }
