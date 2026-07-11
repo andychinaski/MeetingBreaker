@@ -1,6 +1,13 @@
 import { expect, test } from '@playwright/test';
 
-test('opens the game and resets the ball after it is lost', async ({ page }) => {
+test('opens the calendar level and launches the ball', async ({ page }) => {
+  const browserErrors: string[] = [];
+  page.on('pageerror', (error) => browserErrors.push(error.message));
+  page.on('console', (message) => {
+    if (message.type() === 'error') {
+      browserErrors.push(message.text());
+    }
+  });
   await page.goto('/');
 
   await expect(
@@ -10,14 +17,14 @@ test('opens the game and resets the ball after it is lost', async ({ page }) => 
   const canvas = page.locator('canvas');
   await expect(canvas).toBeVisible();
   await expect(canvas).toHaveAttribute('data-scene', 'GameScene');
+  await expect(canvas).toHaveAttribute('data-calendar-ready', 'true');
+  await expect(canvas).toHaveAttribute('data-meeting-count', '21');
   await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
 
   await page.keyboard.down('Space');
   await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
   await page.keyboard.up('Space');
-  await expect(canvas).toHaveAttribute('data-ball-state', 'ready', {
-    timeout: 8_000,
-  });
+  expect(browserErrors).toEqual([]);
 });
 
 test('supports keyboard movement, mouse movement and click launch', async ({

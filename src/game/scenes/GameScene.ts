@@ -1,4 +1,6 @@
 import Phaser from 'phaser';
+import { DEFAULT_LEVEL } from '../../data/levels';
+import { getMeetingType } from '../../data/meetingTypes';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config/gameConfig';
 import {
   BALL_RADIUS,
@@ -9,6 +11,8 @@ import {
   WORLD_PADDING,
 } from '../config/gameplay';
 import { Ball } from '../objects/Ball';
+import { CalendarGrid } from '../objects/CalendarGrid';
+import { MeetingBlock } from '../objects/MeetingBlock';
 import { Paddle } from '../objects/Paddle';
 import {
   accelerateVelocity,
@@ -18,6 +22,10 @@ import {
   nudgeLoopingTrajectory,
   type HorizontalDirection,
 } from '../systems/ballPhysics';
+import {
+  calculateMeetingRect,
+  DEFAULT_CALENDAR_LAYOUT,
+} from '../systems/calendarLayout';
 
 export class GameScene extends Phaser.Scene {
   private paddle!: Paddle;
@@ -31,6 +39,7 @@ export class GameScene extends Phaser.Scene {
   private launchDirection: HorizontalDirection = 1;
   private loopNudgeDirection: HorizontalDirection = 1;
   private readonly recentPaddleImpacts: number[] = [];
+  private readonly meetingBlocks: MeetingBlock[] = [];
 
   constructor() {
     super('GameScene');
@@ -39,6 +48,7 @@ export class GameScene extends Phaser.Scene {
   create(): void {
     this.drawBounds();
     this.configureWorld();
+    this.createCalendar();
     this.createObjects();
     this.configureInput();
     this.configureCollisions();
@@ -84,6 +94,25 @@ export class GameScene extends Phaser.Scene {
     this.ball.resetOnPaddle(this.paddle);
   }
 
+  private createCalendar(): void {
+    this.meetingBlocks.length = 0;
+    new CalendarGrid(this, DEFAULT_CALENDAR_LAYOUT);
+
+    for (const meetingConfig of DEFAULT_LEVEL.meetings) {
+      const meetingType = getMeetingType(meetingConfig.typeId);
+      const rectangle = calculateMeetingRect(
+        meetingConfig,
+        DEFAULT_CALENDAR_LAYOUT,
+      );
+      this.meetingBlocks.push(
+        new MeetingBlock(this, meetingConfig, meetingType, rectangle),
+      );
+    }
+
+    this.game.canvas.dataset.calendarReady = 'true';
+    this.game.canvas.dataset.meetingCount = this.meetingBlocks.length.toString();
+  }
+
   private configureInput(): void {
     const keyboard = this.input.keyboard;
 
@@ -110,6 +139,12 @@ export class GameScene extends Phaser.Scene {
     this.physics.add.collider(this.ball, this.paddle, () => {
       this.handlePaddleCollision();
     });
+
+    for (const meetingBlock of this.meetingBlocks) {
+      this.physics.add.collider(this.ball, meetingBlock.collisionZone, () => {
+        meetingBlock.takeDamage();
+      });
+    }
   }
 
   private updateKeyboardMovement(delta: number): void {
@@ -249,6 +284,8 @@ export class GameScene extends Phaser.Scene {
       this.handleCanvasPointerDown,
     );
     delete this.game.canvas.dataset.ballState;
+    delete this.game.canvas.dataset.calendarReady;
+    delete this.game.canvas.dataset.meetingCount;
     delete this.game.canvas.dataset.paddleX;
     delete this.game.canvas.dataset.scene;
   }
