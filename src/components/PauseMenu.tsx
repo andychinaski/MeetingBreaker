@@ -23,7 +23,7 @@ export function PauseMenu({ onResume, onRestart, onExit }: PauseMenuProps) {
             Начать заново
           </button>
           <button type="button" className={styles.secondaryButton} onClick={onExit}>
-            Закончить рабочий день
+            Закончить рабочую неделю
           </button>
         </div>
         <p className={styles.pauseHint}>Esc — продолжить · R — начать заново</p>

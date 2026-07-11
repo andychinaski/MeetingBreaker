@@ -25,7 +25,7 @@ describe('GameResultOverlay', () => {
       />,
     );
 
-    expect(html).toContain('Рабочий день спасён');
+    expect(html).toContain('Рабочая неделя спасена');
     expect(html).toContain('6 ч 45 мин');
     expect(html).toContain('Meeting Destroyer');
   });
@@ -43,6 +43,6 @@ describe('GameResultOverlay', () => {
     expect(html).toContain('Кофе закончился');
     expect(html).toContain('Встречи победили');
     expect(html).toContain('Заварить заново');
-    expect(html).toContain('Закончить рабочий день');
+    expect(html).toContain('Закончить рабочую неделю');
   });
 });

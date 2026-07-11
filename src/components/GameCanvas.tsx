@@ -49,7 +49,7 @@ export function GameCanvas() {
       {game && !inMenu && <GameHud game={game} onExitToMenu={exitToMenu} />}
       {inMenu && (
         <div className={styles.exitMenu}>
-          <p>Рабочий день завершён</p>
+          <p>Рабочая неделя завершена</p>
           <h2>Meeting Breaker</h2>
           <button type="button" onClick={startFromMenu}>
             Начать работу

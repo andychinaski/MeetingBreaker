@@ -122,7 +122,7 @@ test('pause stops timers and supports resume, R, restart and exit', async ({
   await page.getByRole('button', { name: 'Пауза' }).click();
   pauseDialog = page.getByRole('dialog');
   await pauseDialog
-    .getByRole('button', { name: 'Закончить рабочий день' })
+    .getByRole('button', { name: 'Закончить рабочую неделю' })
     .click();
   await expect(
     page.getByRole('button', { name: 'Начать работу' }),

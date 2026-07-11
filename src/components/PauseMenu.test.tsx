@@ -14,6 +14,6 @@ describe('PauseMenu', () => {
 
     expect(html).toContain('Продолжить');
     expect(html).toContain('Начать заново');
-    expect(html).toContain('Закончить рабочий день');
+    expect(html).toContain('Закончить рабочую неделю');
   });
 });

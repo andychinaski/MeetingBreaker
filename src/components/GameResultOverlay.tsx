@@ -23,9 +23,9 @@ export function GameResultOverlay({
     <div className={styles.resultBackdrop} role="dialog" aria-modal="true">
       <section className={styles.resultCard}>
         <p className={styles.resultEyebrow}>
-          {victory ? 'Неделя под контролем' : 'Рабочий день завершён'}
+          {victory ? 'Неделя под контролем' : 'Рабочая неделя завершена'}
         </p>
-        <h2>{victory ? 'Рабочий день спасён' : 'Кофе закончился'}</h2>
+        <h2>{victory ? 'Рабочая неделя спасена' : 'Кофе закончился'}</h2>
         {!victory && <p className={styles.defeatMessage}>Встречи победили.</p>}
 
         {victory && (
@@ -60,7 +60,7 @@ export function GameResultOverlay({
             {victory ? 'Сыграть ещё раз' : 'Заварить заново'}
           </button>
           <button type="button" className={styles.secondaryButton} onClick={onExit}>
-            Закончить рабочий день
+            Закончить рабочую неделю
           </button>
         </div>
       </section>

@@ -31,7 +31,7 @@ export function calculateRating(score: number): string {
   }
 
   if (score >= 4_500) {
-    return 'Рабочий день спасён';
+    return 'Рабочая неделя спасена';
   }
 
   if (score >= 2_500) {
