@@ -27,6 +27,7 @@ interface GameHudProps {
   game: Phaser.Game;
   onExitToMenu: () => void;
   onLevelResult: (result: LevelResult) => void;
+  onNextLevel: () => void;
 }
 
 interface HudState {
@@ -62,6 +63,7 @@ export function GameHud({
   game,
   onExitToMenu,
   onLevelResult,
+  onNextLevel,
 }: GameHudProps) {
   const [hud, setHud] = useState(INITIAL_HUD_STATE);
   const [notice, setNotice] = useState<string | null>(null);
@@ -215,6 +217,7 @@ export function GameHud({
           result={resultState.result}
           onRestart={restartLevel}
           onExit={onExitToMenu}
+          onNextLevel={onNextLevel}
         />
       )}
 

@@ -28,6 +28,9 @@ describe('GameResultOverlay', () => {
     expect(html).toContain('Рабочая неделя спасена');
     expect(html).toContain('6 ч 45 мин');
     expect(html).toContain('Meeting Destroyer');
+    expect(html).toContain('Сыграть еще');
+    expect(html).toContain('Идем дальше');
+    expect(html).toContain('В главное меню');
   });
 
   it('renders the required defeat message and actions', () => {

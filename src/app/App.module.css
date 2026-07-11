@@ -41,6 +41,9 @@
 .header {
   display: grid;
   gap: 8px;
+  width: min(100%, 620px);
+  margin: 0 auto;
+  text-align: center;
 }
 
 .header h1 {
@@ -57,13 +60,17 @@
   font-weight: 800;
   letter-spacing: 0.14em;
   text-transform: uppercase;
+  font-family: var(--font-accent);
 }
 
 .subtitle {
   margin: 8px 0 0;
   color: var(--color-text-muted);
   font-size: 1.05rem;
+  font-family: var(--font-body);
 }
+
+.gameShell .header { grid-template-columns: 1fr; align-items: center; text-align: center; }
 
 @media (max-width: 700px) {
   .appShell {

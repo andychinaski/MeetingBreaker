@@ -9,6 +9,7 @@ interface GameResultOverlayProps {
   result: LevelResult;
   onRestart: () => void;
   onExit: () => void;
+  onNextLevel?: () => void;
 }
 
 export function GameResultOverlay({
@@ -16,6 +17,7 @@ export function GameResultOverlay({
   result,
   onRestart,
   onExit,
+  onNextLevel = onExit,
 }: GameResultOverlayProps) {
   const victory = outcome === 'victory';
 
@@ -56,12 +58,11 @@ export function GameResultOverlay({
         {victory && <p className={styles.rating}>{result.rating}</p>}
 
         <div className={styles.resultActions}>
-          <button type="button" className={styles.primaryButton} onClick={onRestart}>
-            {victory ? 'Сыграть ещё раз' : 'Заварить заново'}
+          <button type="button" className={victory ? styles.secondaryButton : styles.primaryButton} onClick={onRestart}>
+            {victory ? 'Сыграть еще' : 'Заварить заново'}
           </button>
-          <button type="button" className={styles.secondaryButton} onClick={onExit}>
-            Закончить рабочую неделю
-          </button>
+          {victory ? <button type="button" className={styles.homeButton} aria-label="В главное меню" title="В главное меню" onClick={onExit}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10Z" /></svg></button> : null}
+          {victory ? <button type="button" className={styles.primaryButton} onClick={onNextLevel}>Идем дальше</button> : <button type="button" className={styles.secondaryButton} onClick={onExit}>Закончить рабочую неделю</button>}
         </div>
       </section>
     </div>

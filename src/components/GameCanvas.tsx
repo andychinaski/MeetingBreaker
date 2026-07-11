@@ -19,6 +19,7 @@ interface GameCanvasProps {
   levelId: string;
   onExitToMenu: () => void;
   onLevelResult: (result: LevelResult) => void;
+  onNextLevel: () => void;
 }
 
 export function GameCanvas({
@@ -28,6 +29,7 @@ export function GameCanvas({
   levelId,
   onExitToMenu,
   onLevelResult,
+  onNextLevel,
 }: GameCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const initialSettings = useRef(settings);
@@ -64,6 +66,7 @@ export function GameCanvas({
           game={game}
           onExitToMenu={onExitToMenu}
           onLevelResult={onLevelResult}
+          onNextLevel={onNextLevel}
         />
       )}
       <div className={styles.statusBar}>

@@ -67,7 +67,7 @@ export function SettingsModal({ settings, preferences, onSave, onTutorial, onClo
         <label className={styles.field}><span>Язык</span><select value={draft.language} onChange={(event) => setDraft({ ...draft, language: event.target.value as UserSettings['language'] })}><option value="ru">Русский</option><option value="en">English</option></select></label>
         <label className={styles.field}><span>Палитра встреч</span><select value={draft.meetingPalette} onChange={(event) => setDraft({ ...draft, meetingPalette: event.target.value as UserSettings['meetingPalette'] })}><option value="default">Стандартная</option><option value="pastel">Пастельная</option><option value="high-contrast">Высокий контраст</option></select></label>
         <label className={styles.field}><span>Имя игрока</span><input maxLength={24} value={preferencesDraft.playerName ?? ''} onChange={(event) => setPreferencesDraft({ ...preferencesDraft, playerName: event.target.value })} /></label>
-        <button type="button" className={styles.secondary} onClick={onTutorial}>Повторить обучение</button>
+        <button type="button" className={`${styles.secondary} ${styles.repeatTutorial}`} onClick={onTutorial}>Повторить обучение</button>
 
         <div className={styles.actions}>
           <button type="button" className={styles.secondary} onClick={onClose}>

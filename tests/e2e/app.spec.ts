@@ -220,7 +220,7 @@ test('menu delays Phaser creation and persists settings', async ({ page }) => {
   await expect(page.getByLabel('Главное меню')).toBeVisible();
   await expect(page.locator('canvas')).toHaveCount(0);
   await expect(page.getByText('Лучший результат')).toBeVisible();
-  await expect(page.getByText('Пять дней, один мяч и слишком много встреч.')).toBeVisible();
+  await expect(page.getByText('Освободи время для настоящей работы')).toBeVisible();
   await expect(page.getByText('Разбей все встречи и сохрани кофе до пятницы.')).toBeVisible();
   const menuButtons = page.getByLabel('Главное меню').locator('button');
   const boxes = await menuButtons.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect()).map(({ x, y, width }) => ({ x, y, width })));

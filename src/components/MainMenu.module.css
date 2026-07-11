@@ -10,10 +10,10 @@
   box-shadow: var(--shadow-card);
 }
 
-.kicker { margin: 0; color: var(--accent-primary); font-size: .7rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; }
-.description { margin: 8px 0 0; color: var(--color-text-muted); }
+.kicker { margin: 0; color: var(--accent-primary); font-family: var(--font-accent); font-size: 1rem; font-weight: 900; letter-spacing: .12em; text-transform: uppercase; overflow-wrap: anywhere; }
+.description { margin: 8px 0 0; color: var(--color-text-muted); font-family: var(--font-body); font-weight: 400; }
 .levelSelect { display: grid; gap: 7px; }
-.levelSelect span, .records dt { color: var(--color-text-muted); font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
+.levelSelect span, .records dt { color: var(--color-text-muted); font-family: var(--font-accent); font-size: .68rem; font-weight: 800; letter-spacing: .08em; text-transform: uppercase; }
 .levelSelect select { width: 100%; padding: 12px; border: 1px solid var(--color-border); border-radius: 10px; color: var(--color-text); background: var(--color-background); }
 .records { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin: 0; }
 .records div { padding: 13px; border-radius: 11px; background: color-mix(in srgb, var(--color-background) 72%, var(--color-surface)); }
@@ -30,7 +30,7 @@
 .settingsButton:hover { border-color: var(--accent-primary); background: color-mix(in srgb, var(--accent-primary) 9%, transparent); }
 .modeCard { display: grid; gap: 5px; border: 1px solid var(--color-border); color: var(--color-text); text-align: left; background: var(--color-background); }
 .modeCard:hover { border-color: var(--accent-primary); background: color-mix(in srgb, var(--accent-primary) 10%, var(--color-background)); }
-.modeCard strong { color: var(--accent-primary); }
-.modeCard span { color: var(--color-text-muted); line-height: 1.45; }
+.modeCard strong { color: var(--accent-primary); font-family: var(--font-accent); font-size: calc(1rem + 2px); font-weight: 700; }
+.modeCard span { color: var(--color-text-muted); font-family: var(--font-body); font-weight: 400; line-height: 1.45; }
 .actions { display: flex; justify-content: flex-end; gap: 10px; }
 @media (max-width: 640px) { .menuCard { width: min(100%, 520px); padding: 22px; } .records { grid-template-columns: 1fr; } .actions { display: grid; } }
