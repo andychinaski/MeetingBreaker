@@ -28,9 +28,9 @@ export class BootScene extends Phaser.Scene {
     }
 
     const graphics = this.make.graphics({ x: 0, y: 0 }, false);
-    graphics.fillStyle(0x5eead4, 1);
+    graphics.fillStyle(0x0f6cbd, 1);
     graphics.fillRoundedRect(0, 0, PADDLE_WIDTH, PADDLE_HEIGHT, 10);
-    graphics.lineStyle(2, 0xccfbf1, 0.9);
+    graphics.lineStyle(2, 0xffffff, 0.9);
     graphics.strokeRoundedRect(1, 1, PADDLE_WIDTH - 2, PADDLE_HEIGHT - 2, 9);
     graphics.generateTexture(PADDLE_TEXTURE, PADDLE_WIDTH, PADDLE_HEIGHT);
     graphics.destroy();

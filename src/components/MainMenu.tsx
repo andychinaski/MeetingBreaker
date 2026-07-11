@@ -34,7 +34,6 @@ export function MainMenu({
     <section className={styles.menuCard} aria-label="Главное меню">
       <div>
         <p className={styles.kicker}>{playerName ? `Привет, ${playerName}` : 'План на неделю'}</p>
-        <h2>Освободи время для настоящей работы</h2>
         <p className={styles.description}>
           Разбей все встречи и сохрани кофе до пятницы.
         </p>

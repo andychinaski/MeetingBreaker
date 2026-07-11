@@ -13,13 +13,15 @@ import { addLeaderboardEntry, clearLeaderboard, loadProfile, normalizePlayerName
 import styles from './App.module.css';
 import { t } from '../services/i18n';
 
-type Screen = 'menu' | 'modes' | 'game' | 'leaderboard' | 'info';
+type Screen = 'menu' | 'modes' | 'game';
 export function App() {
   const [screen, setScreen] = useState<Screen>('menu');
   const [profile, setProfile] = useState(loadProfile);
   const [selectedLevelId, setSelectedLevelId] = useState(LEVELS[0]?.id ?? '');
   const [selectedMode, setSelectedMode] = useState<GameModeId>('campaign');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [infoOpen, setInfoOpen] = useState(false);
   const [onboardingOpen, setOnboardingOpen] = useState(false);
   const [tutorialRequested, setTutorialRequested] = useState(false);
   const sessionStartedAt = useRef(Date.now());
@@ -31,12 +33,12 @@ export function App() {
   const launchMode = (mode: GameModeId) => { sessionStartedAt.current = Date.now(); setSelectedMode(mode); setScreen('game'); };
   return <main className={`${styles.appShell} ${screen === 'game' ? styles.gameShell : styles.menuShell}`}>
     <header className={styles.header}><p className={styles.eyebrow}>Дай календарю пизды</p><h1>Meeting Breaker</h1><p className={styles.subtitle}>{t(profile.settings.language, 'app.subtitle')}</p></header>
-    {screen === 'menu' && <MainMenu levels={LEVELS} selectedLevelId={selectedLevelId} progress={profile.progress} playerName={profile.preferences.playerName} language={profile.settings.language} onSelectLevel={setSelectedLevelId} onStart={beginPlay} onLeaderboard={() => setScreen('leaderboard')} onOpenSettings={() => setSettingsOpen(true)} onInfo={() => setScreen('info')} />}
+    {screen === 'menu' && <MainMenu levels={LEVELS} selectedLevelId={selectedLevelId} progress={profile.progress} playerName={profile.preferences.playerName} language={profile.settings.language} onSelectLevel={setSelectedLevelId} onStart={beginPlay} onLeaderboard={() => setLeaderboardOpen(true)} onOpenSettings={() => setSettingsOpen(true)} onInfo={() => setInfoOpen(true)} />}
     {screen === 'modes' && <ModeSelect onSelect={launchMode} onBack={() => setScreen('menu')} />}
-    {screen === 'leaderboard' && <Leaderboard entries={profile.leaderboard} onClear={() => setProfile((current) => clearLeaderboard(current))} onBack={() => setScreen('menu')} />}
-    {screen === 'info' && <InfoScreen onTutorial={() => { setSelectedMode('campaign'); setTutorialRequested(true); sessionStartedAt.current = Date.now(); setScreen('game'); }} onBack={() => setScreen('menu')} />}
     {screen === 'game' && <GameCanvas settings={profile.settings} mode={selectedMode} tutorial={tutorialRequested} levelId={selectedLevelId} onExitToMenu={() => { setTutorialRequested(false); setScreen('menu'); }} onLevelResult={saveResult} />}
     {settingsOpen && <SettingsModal settings={profile.settings} preferences={profile.preferences} onSave={saveSettings} onTutorial={() => { setSettingsOpen(false); setSelectedMode('campaign'); setTutorialRequested(true); sessionStartedAt.current = Date.now(); setScreen('game'); }} onClose={() => setSettingsOpen(false)} />}
+    {leaderboardOpen && <Leaderboard entries={profile.leaderboard} onClear={() => setProfile((current) => clearLeaderboard(current))} onClose={() => setLeaderboardOpen(false)} />}
+    {infoOpen && <InfoScreen onTutorial={() => { setInfoOpen(false); setSelectedMode('campaign'); setTutorialRequested(true); sessionStartedAt.current = Date.now(); setScreen('game'); }} onClose={() => setInfoOpen(false)} />}
     {onboardingOpen && <OnboardingModal preferences={profile.preferences} onComplete={completeOnboarding} onClose={() => setOnboardingOpen(false)} />}
   </main>;
 }

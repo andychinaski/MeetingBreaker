@@ -64,6 +64,7 @@ import { GAME_MODES, LEVEL_REGISTRY_KEY, MODE_REGISTRY_KEY, TUTORIAL_REGISTRY_KE
 import type { MeetingBlockConfig, WorkDay } from '../types/meeting';
 import type { LevelConfig } from '../types/level';
 import { TutorialController, type TutorialEvent } from '../systems/TutorialController';
+import { GAME_THEME_REGISTRY_KEY, getGameTheme, type GameTheme } from '../config/theme';
 
 const COFFEE_LOSS_MESSAGES: string[] = [
   'Задача потеряна. Пора за кофе.',
@@ -104,6 +105,9 @@ export class GameScene extends Phaser.Scene {
   private tutorialController?: TutorialController;
   private tutorialText?: Phaser.GameObjects.Text;
   private sessionMeetings: MeetingBlockConfig[] = [];
+  private calendarGrid?: CalendarGrid;
+  private boundsGraphics?: Phaser.GameObjects.Graphics;
+  private theme!: GameTheme;
 
   constructor() {
     super('GameScene');
@@ -118,6 +122,7 @@ export class GameScene extends Phaser.Scene {
     this.configureInput();
     this.configureCollisions();
     this.configureGameEvents();
+    this.applyTheme(this.game.registry.get(GAME_THEME_REGISTRY_KEY) as UserSettings['theme'] | undefined ?? 'dark');
 
     this.setCanvasState('ready');
     this.publishGameStarted();
@@ -213,7 +218,7 @@ export class GameScene extends Phaser.Scene {
 
   private createCalendar(): void {
     this.meetingBlocks.length = 0;
-    new CalendarGrid(this, DEFAULT_CALENDAR_LAYOUT);
+    this.calendarGrid = new CalendarGrid(this, DEFAULT_CALENDAR_LAYOUT);
 
     for (const meetingConfig of this.sessionMeetings) {
       const meetingType = getMeetingType(meetingConfig.typeId);
@@ -324,6 +329,7 @@ export class GameScene extends Phaser.Scene {
       this,
     );
     this.game.events.on(GAME_EVENTS.MEETING_BEHAVIOR_ACTION, this.handleBehaviorAction, this);
+    this.game.events.on(GAME_EVENTS.THEME_CHANGED, this.applyTheme, this);
   }
 
   private readonly handleBehaviorAction = (payload: MeetingBehaviorActionPayload): void => {
@@ -808,15 +814,23 @@ export class GameScene extends Phaser.Scene {
   }
 
   private drawBounds(): void {
+    this.boundsGraphics?.destroy();
     const graphics = this.add.graphics();
-    graphics.lineStyle(2, 0x334155, 0.9);
-    graphics.beginPath();
-    graphics.moveTo(WORLD_PADDING, GAME_HEIGHT);
-    graphics.lineTo(WORLD_PADDING, WORLD_PADDING);
-    graphics.lineTo(GAME_WIDTH - WORLD_PADDING, WORLD_PADDING);
-    graphics.lineTo(GAME_WIDTH - WORLD_PADDING, GAME_HEIGHT);
-    graphics.strokePath();
+    graphics.lineStyle(2, this.theme?.bounds ?? 0x334155, 0.9);
+    graphics.beginPath(); graphics.moveTo(WORLD_PADDING, GAME_HEIGHT); graphics.lineTo(WORLD_PADDING, WORLD_PADDING); graphics.lineTo(GAME_WIDTH - WORLD_PADDING, WORLD_PADDING); graphics.lineTo(GAME_WIDTH - WORLD_PADDING, GAME_HEIGHT); graphics.strokePath();
+    this.boundsGraphics = graphics;
   }
+
+  private readonly applyTheme = (themeName: UserSettings['theme'] = 'dark'): void => {
+    this.theme = getGameTheme(themeName);
+    this.cameras.main.setBackgroundColor(this.theme.canvas);
+    this.game.canvas.style.backgroundColor = this.theme.canvasCss;
+    this.calendarGrid?.setTheme(this.theme);
+    this.meetingBlocks.forEach((block) => block.setTheme(this.theme));
+    this.drawBounds();
+    if (this.tutorialText) this.tutorialText.setStyle({ color: this.theme.tutorialText, backgroundColor: this.theme.tutorialBackground });
+    this.game.canvas.dataset.theme = themeName;
+  };
 
   private setCanvasState(
     state:
@@ -865,6 +879,7 @@ export class GameScene extends Phaser.Scene {
       this,
     );
     this.game.events.off(GAME_EVENTS.MEETING_BEHAVIOR_ACTION, this.handleBehaviorAction, this);
+    this.game.events.off(GAME_EVENTS.THEME_CHANGED, this.applyTheme, this);
     delete this.game.canvas.dataset.ballState;
     delete this.game.canvas.dataset.activeBalls;
     delete this.game.canvas.dataset.calendarReady;
@@ -885,5 +900,6 @@ export class GameScene extends Phaser.Scene {
     delete this.game.canvas.dataset.wave;
     delete this.game.canvas.dataset.waveWarning;
     delete this.game.canvas.dataset.tutorialStep;
+    delete this.game.canvas.dataset.theme;
   }
 }

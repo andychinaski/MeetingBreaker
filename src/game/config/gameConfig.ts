@@ -4,6 +4,7 @@ import { GameScene } from '../scenes/GameScene';
 import type { UserSettings } from '../../services/storageService';
 import { SETTINGS_REGISTRY_KEY } from '../../services/storageService';
 import { LEVEL_REGISTRY_KEY, MODE_REGISTRY_KEY, TUTORIAL_REGISTRY_KEY, type GameModeId } from '../types/mode';
+import { GAME_THEME_REGISTRY_KEY, getGameTheme } from './theme';
 
 export const GAME_WIDTH = 1280;
 export const GAME_HEIGHT = 720;
@@ -20,7 +21,7 @@ export function createGameConfig(
     parent,
     width: GAME_WIDTH,
     height: GAME_HEIGHT,
-    backgroundColor: '#101827',
+    backgroundColor: settings ? getGameTheme(settings.theme).canvasCss : '#101827',
     transparent: true,
     physics: {
       default: 'arcade',
@@ -41,6 +42,7 @@ export function createGameConfig(
     callbacks: {
       preBoot: (game) => {
         if (settings) game.registry.set(SETTINGS_REGISTRY_KEY, settings);
+        game.registry.set(GAME_THEME_REGISTRY_KEY, settings?.theme ?? 'dark');
         game.registry.set(MODE_REGISTRY_KEY, mode);
         game.registry.set(TUTORIAL_REGISTRY_KEY, tutorial);
         game.registry.set(LEVEL_REGISTRY_KEY, levelId);

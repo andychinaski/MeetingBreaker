@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import type { PlayerPreferences, UserSettings } from '../services/storageService';
 import styles from './SettingsModal.module.css';
+import { Modal } from './Modal';
 
 interface SettingsModalProps {
   settings: UserSettings;
@@ -15,10 +16,8 @@ export function SettingsModal({ settings, preferences, onSave, onTutorial, onClo
   const [preferencesDraft, setPreferencesDraft] = useState(preferences);
 
   return (
-    <div className={styles.backdrop} role="dialog" aria-modal="true">
-      <section className={styles.modal}>
+    <Modal title="Настройки" onClose={onClose}>
         <p className={styles.kicker}>Локальные настройки</p>
-        <h2>Настройки</h2>
 
         <label className={styles.checkboxRow}>
           <input
@@ -82,7 +81,6 @@ export function SettingsModal({ settings, preferences, onSave, onTutorial, onClo
             Сохранить
           </button>
         </div>
-      </section>
-    </div>
+    </Modal>
   );
 }

@@ -9,6 +9,8 @@ import {
 } from '../services/storageService';
 import styles from './GameCanvas.module.css';
 import type { GameModeId } from '../game/types/mode';
+import { GAME_THEME_REGISTRY_KEY } from '../game/config/theme';
+import { GAME_EVENTS } from '../game/events/gameEvents';
 
 interface GameCanvasProps {
   settings: UserSettings;
@@ -48,7 +50,10 @@ export function GameCanvas({
   }, [levelId, mode, tutorial]);
 
   useEffect(() => {
-    game?.registry.set(SETTINGS_REGISTRY_KEY, settings);
+    if (!game) return;
+    game.registry.set(SETTINGS_REGISTRY_KEY, settings);
+    game.registry.set(GAME_THEME_REGISTRY_KEY, settings.theme);
+    game.events.emit(GAME_EVENTS.THEME_CHANGED, settings.theme);
   }, [game, settings]);
 
   return (

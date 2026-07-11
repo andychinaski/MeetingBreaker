@@ -23,7 +23,7 @@ export class Paddle extends Phaser.Physics.Arcade.Sprite {
 
     this.focusLabel = scene.add
       .text(x, y, 'FOCUS TIME', {
-        color: '#0b1120',
+        color: '#ffffff',
         fontFamily: 'Arial, sans-serif',
         fontSize: '13px',
         fontStyle: 'bold',

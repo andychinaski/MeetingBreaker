@@ -7,18 +7,34 @@ import {
   formatCalendarTime,
   WORK_DAY_LABELS,
 } from '../systems/calendarLayout';
+import type { GameTheme } from '../config/theme';
+import { getGameTheme } from '../config/theme';
 
 export class CalendarGrid extends Phaser.GameObjects.Container {
+  private readonly graphics: Phaser.GameObjects.Graphics;
+  private readonly labels: Phaser.GameObjects.Text[] = [];
+  private readonly layout: CalendarLayout;
+  private theme: GameTheme;
   constructor(scene: Phaser.Scene, layout: CalendarLayout) {
     super(scene, 0, 0);
     scene.add.existing(this);
     this.setDepth(0);
 
-    const graphics = scene.add.graphics();
-    this.add(graphics);
-    this.drawColumns(graphics, layout);
-    this.drawTimeLines(graphics, layout);
+    this.layout = layout;
+    this.theme = getGameTheme('dark');
+    this.graphics = scene.add.graphics();
+    this.add(this.graphics);
+    this.drawColumns(this.graphics, layout);
+    this.drawTimeLines(this.graphics, layout);
     this.createLabels(layout);
+  }
+
+  setTheme(theme: GameTheme): void {
+    this.theme = theme;
+    this.graphics.clear();
+    this.drawColumns(this.graphics, this.layout);
+    this.drawTimeLines(this.graphics, this.layout);
+    this.labels.forEach((label, index) => label.setColor(index < WORK_DAY_LABELS.length ? theme.label : theme.mutedLabel));
   }
 
   private drawColumns(
@@ -29,9 +45,9 @@ export class CalendarGrid extends Phaser.GameObjects.Container {
 
     for (let index = 0; index < WORK_DAY_LABELS.length; index += 1) {
       const x = layout.x + index * (columnWidth + layout.columnGap);
-      graphics.fillStyle(index % 2 === 0 ? 0x111c2e : 0x142033, 0.9);
+      graphics.fillStyle(index % 2 === 0 ? this.theme.columnOdd : this.theme.columnEven, 0.96);
       graphics.fillRoundedRect(x, layout.y, columnWidth, layout.height, 7);
-      graphics.lineStyle(1, 0x334155, 0.7);
+      graphics.lineStyle(1, this.theme.border, 0.8);
       graphics.strokeRoundedRect(x, layout.y, columnWidth, layout.height, 7);
     }
   }
@@ -49,7 +65,7 @@ export class CalendarGrid extends Phaser.GameObjects.Container {
       const isFullHour = minutes % 60 === 0;
       graphics.lineStyle(
         isFullHour ? 1.5 : 1,
-        isFullHour ? 0x64748b : 0x475569,
+        isFullHour ? this.theme.majorGrid : this.theme.minorGrid,
         isFullHour ? 0.5 : 0.25,
       );
       graphics.lineBetween(layout.x, y, layout.x + layout.width, y);
@@ -66,13 +82,14 @@ export class CalendarGrid extends Phaser.GameObjects.Container {
         columnWidth / 2;
       const label = this.scene.add
         .text(x, layout.y - 27, WORK_DAY_LABELS[index] ?? '', {
-          color: '#cbd5e1',
+          color: this.theme.label,
           fontFamily: 'Arial, sans-serif',
           fontSize: '14px',
           fontStyle: 'bold',
         })
         .setOrigin(0.5);
       this.add(label);
+      this.labels.push(label);
     }
 
     for (
@@ -86,13 +103,14 @@ export class CalendarGrid extends Phaser.GameObjects.Container {
           calendarMinutesToY(minutes, layout),
           formatCalendarTime(minutes),
           {
-            color: '#64748b',
+            color: this.theme.mutedLabel,
             fontFamily: 'Arial, sans-serif',
             fontSize: '11px',
           },
         )
         .setOrigin(1, 0.5);
       this.add(label);
+      this.labels.push(label);
     }
   }
 }

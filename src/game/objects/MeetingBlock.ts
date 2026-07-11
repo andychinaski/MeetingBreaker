@@ -23,6 +23,8 @@ import {
   type MeetingBehaviorContext,
 } from '../behaviors/MeetingBehavior';
 import { DEFAULT_SETTINGS, SETTINGS_REGISTRY_KEY, type UserSettings } from '../../services/storageService';
+import type { GameTheme } from '../config/theme';
+import { getGameTheme } from '../config/theme';
 
 type VisualDamageState = 'normal' | 'damaged' | 'severely-damaged';
 
@@ -38,6 +40,8 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
   private shielded = false;
   private readonly behaviors: MeetingBehavior[];
   private readonly behaviorContext: MeetingBehaviorContext;
+  private surfaceColor = 0x172033;
+  private shadeColor = 0x0f172a;
 
   constructor(
     scene: Phaser.Scene,
@@ -63,6 +67,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
     this.durability = new MeetingDurability(
       config.customHp ?? meetingType.maxHp,
     );
+    this.setTheme(getGameTheme(settings.theme));
     // HOTFIX 2: post-MVP behaviors are intentionally disabled until their
     // mechanics can be introduced progressively and explained to the player.
     this.behaviors = createMeetingBehaviors([]);
@@ -153,6 +158,14 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
     }
   }
 
+  setTheme(theme: GameTheme): void {
+    this.surfaceColor = theme.canvas === 0xf5f9fd ? 0xffffff : 0x172033;
+    this.shadeColor = theme.canvas === 0xf5f9fd ? 0x163b5c : 0x0f172a;
+    this.list.filter((child): child is Phaser.GameObjects.Text => child instanceof Phaser.GameObjects.Text)
+      .forEach((text) => text.setColor(theme.canvas === 0xf5f9fd ? '#102a43' : '#f8fafc'));
+    if (this.background) this.drawVisualState(this.getDamageState());
+  }
+
   private createContent(): void {
     const left = -this.blockWidth / 2 + 10;
     const top = -this.blockHeight / 2;
@@ -228,7 +241,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
     const alpha = state === 'normal' ? 0.92 : state === 'damaged' ? 0.7 : 0.48;
 
     this.background.clear();
-    this.background.fillStyle(0x172033, 0.97);
+    this.background.fillStyle(this.surfaceColor, 0.97);
     this.background.fillRoundedRect(
       left,
       top,
@@ -244,7 +257,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
       this.blockHeight - 4,
       5,
     );
-    this.background.fillStyle(0x0f172a, 0.25);
+    this.background.fillStyle(this.shadeColor, 0.25);
     this.background.fillRect(left + 6, top + 2, 4, this.blockHeight - 4);
     this.background.lineStyle(1, 0xffffff, state === 'normal' ? 0.2 : 0.1);
     this.background.strokeRoundedRect(
@@ -255,7 +268,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
       6,
     );
     if (this.shielded) {
-      this.background.lineStyle(3, 0x67e8f9, 0.95);
+      this.background.lineStyle(3, 0x2886de, 0.95);
       this.background.strokeRoundedRect(left - 2, top - 2, this.blockWidth + 4, this.blockHeight + 4, 8);
     }
 
@@ -269,7 +282,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
   private drawCrack(branches: number): void {
     const startX = this.blockWidth * 0.2;
     const startY = -this.blockHeight / 2 + 3;
-    this.cracks.lineStyle(1.5, 0x0f172a, 0.65);
+    this.cracks.lineStyle(1.5, this.shadeColor, 0.65);
 
     for (let index = 0; index < branches; index += 1) {
       const offset = index * 11;

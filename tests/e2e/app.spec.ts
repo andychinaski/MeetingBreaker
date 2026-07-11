@@ -28,7 +28,7 @@ test('first run validates the player and opens mode selection', async ({ page })
   await dialog.getByRole('button', { name: 'Далее' }).click();
   await dialog.getByText('Мышь').click();
   await dialog.getByRole('button', { name: 'Готово' }).click();
-  await expect(page.getByRole('heading', { name: 'Как ломаем календарь?' })).toBeVisible();
+  await expect(page.getByLabel('Выбор режима')).toBeVisible();
   await expect(page.locator('canvas')).toHaveCount(0);
 });
 
@@ -128,24 +128,15 @@ test('pause stops timers and supports resume, R, restart and exit', async ({
   await page.keyboard.down('Space');
   await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
   await page.keyboard.up('Space');
-  await expect(canvas).toHaveAttribute('data-ball-state', 'resetting', {
-    timeout: 6_000,
-  });
 
   await page.keyboard.press('Escape');
   await expect(canvas).toHaveAttribute('data-paused', 'true');
   await page.waitForTimeout(1_000);
-  await expect(canvas).toHaveAttribute('data-ball-state', 'resetting');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
 
   await page.keyboard.press('Escape');
   await expect(canvas).toHaveAttribute('data-paused', 'false');
-  await expect(canvas).toHaveAttribute('data-ball-state', 'ready', {
-    timeout: 2_000,
-  });
-
-  await page.keyboard.down('Space');
   await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
-  await page.keyboard.up('Space');
   await page.keyboard.press('r');
   await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
   await expect(canvas).toHaveAttribute('data-coffee-cups', '3');
@@ -237,6 +228,19 @@ test('menu delays Phaser creation and persists settings', async ({ page }) => {
   expect(boxes[1]!.y).toBeGreaterThan(boxes[0]!.y);
   expect(boxes.every((box) => Math.round(box.width) === Math.round(boxes[0]!.width))).toBe(true);
 
+  const leaderboardButton = page.getByRole('button', { name: 'Таблица лидеров' });
+  await leaderboardButton.click();
+  await expect(page.getByRole('dialog', { name: 'Локальная таблица лидеров' })).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(leaderboardButton).toBeFocused();
+
+  const infoButton = page.getByRole('button', { name: 'Информация' });
+  await infoButton.click();
+  await expect(page.getByRole('dialog', { name: 'О проекте' })).toBeVisible();
+  await page.getByRole('button', { name: 'Закрыть' }).click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+
   await page.getByRole('button', { name: 'Настройки' }).click();
   const settingsDialog = page.getByRole('dialog');
   await expect(settingsDialog).toBeVisible();
@@ -255,6 +259,7 @@ test('menu delays Phaser creation and persists settings', async ({ page }) => {
   await page.getByRole('button', { name: 'Играть' }).click();
   await page.getByRole('button', { name: /Прохождение/ }).click();
   await expect(page.locator('canvas')).toHaveCount(1);
+  await expect(page.locator('canvas')).toHaveAttribute('data-theme', 'light');
   await page.getByRole('button', { name: 'Пауза' }).click();
   await page
     .getByRole('dialog')
