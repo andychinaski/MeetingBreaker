@@ -24,6 +24,7 @@ import {
   type GameStartedPayload,
   type LevelCompletedPayload,
   type MeetingDestroyedPayload,
+  type PauseChangedPayload,
   type ScoreChangedPayload,
 } from '../events/gameEvents';
 import {
@@ -181,6 +182,7 @@ export class GameScene extends Phaser.Scene {
       'pointerdown',
       this.handleCanvasPointerDown,
     );
+    window.addEventListener('keydown', this.handleWindowKeyDown);
   }
 
   private configureCollisions(): void {
@@ -204,6 +206,11 @@ export class GameScene extends Phaser.Scene {
     this.game.events.on(
       GAME_COMMANDS.RESTART_LEVEL,
       this.handleRestartLevel,
+      this,
+    );
+    this.game.events.on(
+      GAME_COMMANDS.TOGGLE_PAUSE,
+      this.handleTogglePause,
       this,
     );
   }
@@ -233,6 +240,20 @@ export class GameScene extends Phaser.Scene {
   private readonly handleCanvasPointerDown = (event: PointerEvent): void => {
     if (event.button === 0) {
       this.launchBall();
+    }
+  };
+
+  private readonly handleWindowKeyDown = (event: KeyboardEvent): void => {
+    if (event.repeat) {
+      return;
+    }
+
+    if (event.code === 'Escape') {
+      event.preventDefault();
+      this.handleTogglePause();
+    } else if (event.code === 'KeyR') {
+      event.preventDefault();
+      this.handleRestartLevel();
     }
   };
 
@@ -373,7 +394,29 @@ export class GameScene extends Phaser.Scene {
   };
 
   private readonly handleRestartLevel = (): void => {
+    this.scene.resume();
     this.scene.restart();
+  };
+
+  private readonly handleTogglePause = (): void => {
+    if (this.gameStatus === 'playing') {
+      this.gameStatus = 'paused';
+      this.updateRegistryState();
+      this.game.canvas.dataset.paused = 'true';
+      const payload: PauseChangedPayload = { paused: true };
+      this.game.events.emit(GAME_EVENTS.PAUSE_CHANGED, payload);
+      this.scene.pause();
+      return;
+    }
+
+    if (this.gameStatus === 'paused') {
+      this.scene.resume();
+      this.gameStatus = 'playing';
+      this.updateRegistryState();
+      this.game.canvas.dataset.paused = 'false';
+      const payload: PauseChangedPayload = { paused: false };
+      this.game.events.emit(GAME_EVENTS.PAUSE_CHANGED, payload);
+    }
   };
 
   private finishWithVictory(): void {
@@ -466,6 +509,7 @@ export class GameScene extends Phaser.Scene {
       this.coffeeSystem.coffeeCups.toString();
     this.game.canvas.dataset.requiredMeetings =
       this.levelProgress.remainingRequired.toString();
+    this.game.canvas.dataset.paused = (this.gameStatus === 'paused').toString();
   }
 
   private cleanupScene(): void {
@@ -477,6 +521,7 @@ export class GameScene extends Phaser.Scene {
       'pointerdown',
       this.handleCanvasPointerDown,
     );
+    window.removeEventListener('keydown', this.handleWindowKeyDown);
     this.game.events.off(
       GAME_EVENTS.MEETING_DESTROYED,
       this.handleMeetingDestroyed,
@@ -487,10 +532,16 @@ export class GameScene extends Phaser.Scene {
       this.handleRestartLevel,
       this,
     );
+    this.game.events.off(
+      GAME_COMMANDS.TOGGLE_PAUSE,
+      this.handleTogglePause,
+      this,
+    );
     delete this.game.canvas.dataset.ballState;
     delete this.game.canvas.dataset.calendarReady;
     delete this.game.canvas.dataset.meetingCount;
     delete this.game.canvas.dataset.paddleX;
+    delete this.game.canvas.dataset.paused;
     delete this.game.canvas.dataset.coffeeCups;
     delete this.game.canvas.dataset.combo;
     delete this.game.canvas.dataset.freedMinutes;

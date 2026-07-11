@@ -10,6 +10,7 @@ import {
   type GameOverPayload,
   type GameStartedPayload,
   type LevelCompletedPayload,
+  type PauseChangedPayload,
   type PowerUpActivatedPayload,
   type ScoreChangedPayload,
 } from '../game/events/gameEvents';
@@ -19,6 +20,7 @@ import {
   GameResultOverlay,
   type GameOutcome,
 } from './GameResultOverlay';
+import { PauseMenu } from './PauseMenu';
 import styles from './GameHud.module.css';
 
 interface GameHudProps {
@@ -57,6 +59,7 @@ export function GameHud({ game, onExitToMenu }: GameHudProps) {
   const [hud, setHud] = useState(INITIAL_HUD_STATE);
   const [notice, setNotice] = useState<string | null>(null);
   const [resultState, setResultState] = useState<ResultState | null>(null);
+  const [paused, setPaused] = useState(false);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -69,6 +72,7 @@ export function GameHud({ game, onExitToMenu }: GameHudProps) {
         ...current,
         ...registryState,
       }));
+      setPaused(registryState.status === 'paused');
     }
 
     const handleStarted = (payload: GameStartedPayload) => {
@@ -81,6 +85,7 @@ export function GameHud({ game, onExitToMenu }: GameHudProps) {
       });
       setNotice(null);
       setResultState(null);
+      setPaused(false);
     };
     const handleScore = (payload: ScoreChangedPayload) => {
       setHud((current) => ({ ...current, ...payload }));
@@ -99,6 +104,9 @@ export function GameHud({ game, onExitToMenu }: GameHudProps) {
     const handlePowerUp = (payload: PowerUpActivatedPayload) => {
       setHud((current) => ({ ...current, activeBonus: payload.title }));
     };
+    const handlePause = (payload: PauseChangedPayload) => {
+      setPaused(payload.paused);
+    };
     const handleVictory = (payload: LevelCompletedPayload) => {
       setResultState({ outcome: 'victory', result: payload.result });
     };
@@ -111,6 +119,7 @@ export function GameHud({ game, onExitToMenu }: GameHudProps) {
     game.events.on(GAME_EVENTS.COFFEE_CHANGED, handleCoffee);
     game.events.on(GAME_EVENTS.COFFEE_CONSUMED, handleCoffeeConsumed);
     game.events.on(GAME_EVENTS.POWER_UP_ACTIVATED, handlePowerUp);
+    game.events.on(GAME_EVENTS.PAUSE_CHANGED, handlePause);
     game.events.on(GAME_EVENTS.LEVEL_COMPLETED, handleVictory);
     game.events.on(GAME_EVENTS.GAME_OVER, handleDefeat);
 
@@ -120,6 +129,7 @@ export function GameHud({ game, onExitToMenu }: GameHudProps) {
       game.events.off(GAME_EVENTS.COFFEE_CHANGED, handleCoffee);
       game.events.off(GAME_EVENTS.COFFEE_CONSUMED, handleCoffeeConsumed);
       game.events.off(GAME_EVENTS.POWER_UP_ACTIVATED, handlePowerUp);
+      game.events.off(GAME_EVENTS.PAUSE_CHANGED, handlePause);
       game.events.off(GAME_EVENTS.LEVEL_COMPLETED, handleVictory);
       game.events.off(GAME_EVENTS.GAME_OVER, handleDefeat);
 
@@ -131,6 +141,10 @@ export function GameHud({ game, onExitToMenu }: GameHudProps) {
 
   const restartLevel = () => {
     game.events.emit(GAME_COMMANDS.RESTART_LEVEL);
+  };
+
+  const togglePause = () => {
+    game.events.emit(GAME_COMMANDS.TOGGLE_PAUSE);
   };
 
   return (
@@ -167,10 +181,9 @@ export function GameHud({ game, onExitToMenu }: GameHudProps) {
         <button
           type="button"
           className={styles.pauseButton}
-          disabled
-          title="Пауза будет реализована на этапе 11"
+          onClick={togglePause}
         >
-          Пауза
+          {paused ? 'Продолжить' : 'Пауза'}
         </button>
       </aside>
 
@@ -184,6 +197,14 @@ export function GameHud({ game, onExitToMenu }: GameHudProps) {
         <GameResultOverlay
           outcome={resultState.outcome}
           result={resultState.result}
+          onRestart={restartLevel}
+          onExit={onExitToMenu}
+        />
+      )}
+
+      {paused && !resultState && (
+        <PauseMenu
+          onResume={togglePause}
           onRestart={restartLevel}
           onExit={onExitToMenu}
         />

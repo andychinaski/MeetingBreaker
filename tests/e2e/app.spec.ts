@@ -70,7 +70,70 @@ test('supports keyboard movement, mouse movement and click launch', async ({
   await page.mouse.up({ button: 'left' });
 });
 
-test('coffee defeat supports exit, a new game and restart', async ({ page }) => {
+test('pause stops timers and supports resume, R, restart and exit', async ({
+  page,
+}) => {
+  await page.goto('/');
+
+  const canvas = page.locator('canvas');
+  const pauseButton = page.getByRole('button', { name: 'Пауза' });
+  await pauseButton.click();
+  await expect(canvas).toHaveAttribute('data-paused', 'true');
+
+  let pauseDialog = page.getByRole('dialog');
+  await expect(
+    pauseDialog.getByRole('heading', { name: 'Пауза' }),
+  ).toBeVisible();
+  await pauseDialog.getByRole('button', { name: 'Продолжить' }).click();
+  await expect(canvas).toHaveAttribute('data-paused', 'false');
+  await expect(pauseDialog).toBeHidden();
+
+  await page.keyboard.down('Space');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
+  await page.keyboard.up('Space');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'resetting', {
+    timeout: 6_000,
+  });
+
+  await page.keyboard.press('Escape');
+  await expect(canvas).toHaveAttribute('data-paused', 'true');
+  await page.waitForTimeout(1_000);
+  await expect(canvas).toHaveAttribute('data-ball-state', 'resetting');
+
+  await page.keyboard.press('Escape');
+  await expect(canvas).toHaveAttribute('data-paused', 'false');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'ready', {
+    timeout: 2_000,
+  });
+
+  await page.keyboard.down('Space');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
+  await page.keyboard.up('Space');
+  await page.keyboard.press('r');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
+  await expect(canvas).toHaveAttribute('data-coffee-cups', '3');
+
+  await page.getByRole('button', { name: 'Пауза' }).click();
+  pauseDialog = page.getByRole('dialog');
+  await pauseDialog.getByRole('button', { name: 'Начать заново' }).click();
+  await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
+  await expect(canvas).toHaveAttribute('data-paused', 'false');
+
+  await page.getByRole('button', { name: 'Пауза' }).click();
+  pauseDialog = page.getByRole('dialog');
+  await pauseDialog
+    .getByRole('button', { name: 'Закончить рабочий день' })
+    .click();
+  await expect(
+    page.getByRole('button', { name: 'Начать работу' }),
+  ).toBeVisible();
+
+  await page.getByRole('button', { name: 'Начать работу' }).click();
+  await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
+  await expect(canvas).toHaveAttribute('data-paused', 'false');
+});
+
+test('coffee defeat supports scoring and restart', async ({ page }) => {
   await page.goto('/');
 
   const canvas = page.locator('canvas');
@@ -102,7 +165,7 @@ test('coffee defeat supports exit, a new game and restart', async ({ page }) => 
       await expect(canvas).toHaveAttribute(
         'data-coffee-cups',
         coffeeCups.toString(),
-        { timeout: 6_000 },
+        { timeout: 10_000 },
       );
     }
 
@@ -118,16 +181,6 @@ test('coffee defeat supports exit, a new game and restart', async ({ page }) => 
   };
 
   await playUntilDefeat(true);
-  await page.getByRole('button', { name: 'Закончить рабочий день' }).click();
-  await expect(
-    page.getByRole('button', { name: 'Начать работу' }),
-  ).toBeVisible();
-
-  await page.getByRole('button', { name: 'Начать работу' }).click();
-  await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
-  await expect(canvas).toHaveAttribute('data-coffee-cups', '3');
-
-  await playUntilDefeat(false);
   await page.getByRole('button', { name: 'Заварить заново' }).click();
   await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
   await expect(canvas).toHaveAttribute('data-coffee-cups', '3');

@@ -52,6 +52,7 @@
   font-size: 0.7rem;
   font-weight: 800;
   pointer-events: auto;
+  cursor: pointer;
 }
 
 .coffeeNotice {
@@ -91,6 +92,40 @@
   border-radius: 20px;
   background: #111c2e;
   box-shadow: 0 30px 90px rgb(0 0 0 / 48%);
+}
+
+.pauseCard {
+  width: min(460px, 100%);
+  padding: 28px;
+  border: 1px solid rgb(94 234 212 / 25%);
+  border-radius: 20px;
+  background: #111c2e;
+  box-shadow: 0 30px 90px rgb(0 0 0 / 48%);
+}
+
+.pauseCard h2 {
+  margin: 0;
+  color: #f8fafc;
+  font-size: clamp(2rem, 5vw, 3.2rem);
+  letter-spacing: -0.04em;
+}
+
+.pauseDescription {
+  margin: 8px 0 0;
+  color: #94a3b8;
+}
+
+.pauseActions {
+  display: grid;
+  gap: 9px;
+  margin-top: 22px;
+}
+
+.pauseHint {
+  margin: 16px 0 0;
+  color: #64748b;
+  font-size: 0.7rem;
+  text-align: center;
 }
 
 .resultEyebrow {

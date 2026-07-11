@@ -7,12 +7,14 @@ export const GAME_EVENTS = {
   COFFEE_CONSUMED: 'COFFEE_CONSUMED',
   MEETING_DESTROYED: 'MEETING_DESTROYED',
   POWER_UP_ACTIVATED: 'POWER_UP_ACTIVATED',
+  PAUSE_CHANGED: 'PAUSE_CHANGED',
   LEVEL_COMPLETED: 'LEVEL_COMPLETED',
   GAME_OVER: 'GAME_OVER',
 } as const;
 
 export const GAME_COMMANDS = {
   RESTART_LEVEL: 'RESTART_LEVEL',
+  TOGGLE_PAUSE: 'TOGGLE_PAUSE',
 } as const;
 
 export const GAME_STATE_REGISTRY_KEY = 'meeting-breaker-game-state';
@@ -47,6 +49,10 @@ export interface MeetingDestroyedPayload {
 export interface PowerUpActivatedPayload {
   powerUpId: string;
   title: string;
+}
+
+export interface PauseChangedPayload {
+  paused: boolean;
 }
 
 export interface LevelCompletedPayload {
