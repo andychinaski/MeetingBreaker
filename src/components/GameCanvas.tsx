@@ -24,8 +24,8 @@ export function GameCanvas() {
     <section className={styles.gameFrame} aria-label="Игровое поле">
       <div ref={containerRef} className={styles.canvasContainer} />
       <div className={styles.statusBar}>
-        <span>Этап 0 · Phaser подключён</span>
-        <span>Canvas готов к игровой сцене</span>
+        <span>A / D или ← / → · движение</span>
+        <span>Space или клик · запуск задачи</span>
       </div>
     </section>
   );

@@ -1,11 +1,62 @@
 import { expect, test } from '@playwright/test';
 
-test('opens the initialized application', async ({ page }) => {
+test('opens the game and resets the ball after it is lost', async ({ page }) => {
   await page.goto('/');
 
   await expect(
     page.getByRole('heading', { name: 'Meeting Breaker' }),
   ).toBeVisible();
   await expect(page.getByLabel('Игровое поле')).toBeVisible();
-  await expect(page.locator('canvas')).toBeVisible();
+  const canvas = page.locator('canvas');
+  await expect(canvas).toBeVisible();
+  await expect(canvas).toHaveAttribute('data-scene', 'GameScene');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
+
+  await page.keyboard.down('Space');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
+  await page.keyboard.up('Space');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'ready', {
+    timeout: 8_000,
+  });
+});
+
+test('supports keyboard movement, mouse movement and click launch', async ({
+  page,
+}) => {
+  await page.goto('/');
+
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
+  const initialPaddleX = Number(await canvas.getAttribute('data-paddle-x'));
+
+  await page.keyboard.down('ArrowRight');
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-paddle-x')))
+    .toBeGreaterThan(initialPaddleX);
+  await page.keyboard.up('ArrowRight');
+
+  await canvas.scrollIntoViewIfNeeded();
+  const bounds = await canvas.boundingBox();
+  expect(bounds).not.toBeNull();
+
+  if (!bounds) {
+    return;
+  }
+
+  await page.mouse.move(
+    bounds.x + bounds.width * 0.75,
+    bounds.y + bounds.height * 0.75,
+  );
+  await page.mouse.move(
+    bounds.x + bounds.width * 0.25,
+    bounds.y + bounds.height * 0.75,
+    { steps: 5 },
+  );
+  await expect
+    .poll(async () => Number(await canvas.getAttribute('data-paddle-x')))
+    .toBeLessThan(initialPaddleX);
+
+  await page.mouse.down({ button: 'left' });
+  await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
+  await page.mouse.up({ button: 'left' });
 });
