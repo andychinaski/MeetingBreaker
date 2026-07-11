@@ -38,6 +38,7 @@ interface HudState {
   coffeeCups: number;
   initialCoffeeCups: number;
   activeBonus: string;
+  coffeeEnabled: boolean;
 }
 
 interface ResultState {
@@ -54,6 +55,7 @@ const INITIAL_HUD_STATE: HudState = {
   coffeeCups: DEFAULT_LEVEL.initialCoffeeCups,
   initialCoffeeCups: DEFAULT_LEVEL.initialCoffeeCups,
   activeBonus: 'Нет',
+  coffeeEnabled: true,
 };
 
 export function GameHud({
@@ -87,6 +89,7 @@ export function GameHud({
         coffeeCups: payload.coffeeCups,
         initialCoffeeCups: payload.initialCoffeeCups,
         activeBonus: 'Нет',
+        coffeeEnabled: payload.coffeeEnabled ?? true,
       });
       setNotice(null);
       setResultState(null);
@@ -167,10 +170,10 @@ export function GameHud({
           <span>Уровень</span>
           <strong>{hud.levelTitle}</strong>
         </div>
-        <div className={styles.statChip}>
+        {hud.coffeeEnabled && <div className={styles.statChip}>
           <span>Очки</span>
           <strong>{hud.score.toLocaleString('ru-RU')}</strong>
-        </div>
+        </div>}
         <div className={styles.statChip}>
           <span>Свободно</span>
           <strong>{formatFreedTime(hud.freedMinutes)}</strong>

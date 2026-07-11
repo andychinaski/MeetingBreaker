@@ -3,6 +3,7 @@ import { PARTICLE_TEXTURE } from '../config/gameplay';
 import {
   GAME_EVENTS,
   type MeetingDestroyedPayload,
+  type MeetingBehaviorActionPayload,
 } from '../events/gameEvents';
 import {
   formatCalendarTime,
@@ -16,6 +17,12 @@ import type {
   MeetingBlockConfig,
   MeetingType,
 } from '../types/meeting';
+import {
+  createMeetingBehaviors,
+  type MeetingBehavior,
+  type MeetingBehaviorContext,
+} from '../behaviors/MeetingBehavior';
+import { DEFAULT_SETTINGS, SETTINGS_REGISTRY_KEY, type UserSettings } from '../../services/storageService';
 
 type VisualDamageState = 'normal' | 'damaged' | 'severely-damaged';
 
@@ -28,6 +35,9 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
   private readonly blockWidth: number;
   private readonly blockHeight: number;
   private destructionStarted = false;
+  private shielded = false;
+  private readonly behaviors: MeetingBehavior[];
+  private readonly behaviorContext: MeetingBehaviorContext;
 
   constructor(
     scene: Phaser.Scene,
@@ -43,10 +53,41 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
 
     this.blockWidth = rectangle.width;
     this.blockHeight = rectangle.height;
-    this.blockColor = Number.parseInt(meetingType.color.slice(1), 16);
+    const settings = (scene.game.registry.get(SETTINGS_REGISTRY_KEY) as UserSettings | undefined) ?? DEFAULT_SETTINGS;
+    const baseColor = Number.parseInt(meetingType.color.slice(1), 16);
+    this.blockColor = settings.meetingPalette === 'pastel'
+      ? Phaser.Display.Color.ValueToColor(baseColor).lighten(28).color
+      : settings.meetingPalette === 'high-contrast'
+        ? Phaser.Display.Color.ValueToColor(baseColor).saturate(55).brighten(18).color
+        : baseColor;
     this.durability = new MeetingDurability(
       config.customHp ?? meetingType.maxHp,
     );
+    this.behaviors = createMeetingBehaviors(
+      meetingType.behaviorIds,
+    );
+    this.behaviorContext = {
+      scene,
+      block: this,
+      config,
+      meetingType,
+      isDestroyed: () => this.destroyed,
+      setShielded: (shielded) => {
+        this.shielded = shielded;
+        this.drawVisualState(this.getDamageState());
+      },
+      setBlinking: (active) => this.setAlpha(active ? 0.48 : 1),
+      moveBy: (x, y) => {
+        this.x += x;
+        this.y += y;
+        this.collisionZone.setPosition(this.x, this.y);
+        (this.collisionZone.body as Phaser.Physics.Arcade.StaticBody).updateFromGameObject();
+      },
+      emitAction: (action) => {
+        const payload: MeetingBehaviorActionPayload = { action, meetingId: config.id, typeId: meetingType.id, config: meetingType.behaviorConfig ?? {}, x: this.x, y: this.y };
+        scene.game.events.emit(GAME_EVENTS.MEETING_BEHAVIOR_ACTION, payload);
+      },
+    };
 
     scene.add.existing(this);
     this.setSize(this.blockWidth, this.blockHeight);
@@ -65,7 +106,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
     this.add([this.background, this.cracks]);
     this.drawVisualState('normal');
     this.createContent();
-
+    this.behaviors.forEach((behavior) => behavior.onCreate?.(this.behaviorContext));
   }
 
   get currentHp(): number {
@@ -77,6 +118,11 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
   }
 
   takeDamage(amount = 1): DamageResult {
+    this.behaviors.forEach((behavior) => behavior.onBallCollision?.(this.behaviorContext));
+    if (this.shielded) {
+      this.scene.tweens.add({ targets: this, alpha: 0.55, duration: 55, yoyo: true });
+      return this.durability.damage(0);
+    }
     const result = this.durability.damage(amount);
 
     if (result.previousHp === result.currentHp) {
@@ -89,8 +135,22 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
       this.drawVisualState(this.getDamageState());
       this.playHitAnimation();
     }
+    this.behaviors.forEach((behavior) => behavior.onHit?.(this.behaviorContext));
 
     return result;
+  }
+
+  updateBehavior(delta: number): void {
+    if (!this.destructionStarted) {
+      this.behaviors.forEach((behavior) => behavior.onUpdate?.(this.behaviorContext, delta));
+    }
+  }
+
+  removeShield(): void {
+    if (this.shielded) {
+      this.shielded = false;
+      this.drawVisualState(this.getDamageState());
+    }
   }
 
   private createContent(): void {
@@ -194,6 +254,10 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
       this.blockHeight - 2,
       6,
     );
+    if (this.shielded) {
+      this.background.lineStyle(3, 0x67e8f9, 0.95);
+      this.background.strokeRoundedRect(left - 2, top - 2, this.blockWidth + 4, this.blockHeight + 4, 8);
+    }
 
     this.cracks.clear();
 
@@ -236,6 +300,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
     }
 
     this.destructionStarted = true;
+    this.behaviors.forEach((behavior) => behavior.onDestroy?.(this.behaviorContext));
     const body = this.collisionZone.body as Phaser.Physics.Arcade.StaticBody;
     body.enable = false;
     this.emitDestructionEvent();
@@ -260,8 +325,8 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
     const payload: MeetingDestroyedPayload = {
       meetingId: this.config.id,
       typeId: this.meetingType.id,
-      score: this.meetingType.score,
-      freedMinutes: this.meetingType.freedMinutes,
+      score: Math.round(this.meetingType.score * (this.config.scoreMultiplier ?? 1)),
+      freedMinutes: Math.round(this.meetingType.freedMinutes * (this.config.scoreMultiplier ?? 1)),
       required: this.config.required ?? true,
       dropChance: this.meetingType.dropChance,
       x: this.x,
@@ -312,6 +377,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
   }
 
   override destroy(fromScene?: boolean): void {
+    this.behaviors.forEach((behavior) => behavior.dispose?.());
     if (this.collisionZone.active) {
       this.collisionZone.destroy(fromScene);
     }

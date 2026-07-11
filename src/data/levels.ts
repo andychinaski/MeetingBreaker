@@ -1,6 +1,6 @@
 import type { LevelConfig } from '../game/types/level';
 
-export const LEVELS: readonly LevelConfig[] = [
+const BASE_LEVELS: readonly LevelConfig[] = [
   {
     id: 'calendar-overload',
     title: 'Calendar Overload',
@@ -20,8 +20,8 @@ export const LEVELS: readonly LevelConfig[] = [
       },
       {
         id: 'mon-sync',
-        typeId: 'team-sync',
-        title: 'Team Sync',
+        typeId: 'project-status',
+        title: 'Project Status',
         day: 'monday',
         startMinutes: 585,
         durationMinutes: 30,
@@ -30,8 +30,8 @@ export const LEVELS: readonly LevelConfig[] = [
       },
       {
         id: 'mon-refinement',
-        typeId: 'refinement',
-        title: 'Backlog Refinement',
+        typeId: 'retrospective',
+        title: 'Retrospective',
         day: 'monday',
         startMinutes: 660,
         durationMinutes: 60,
@@ -60,8 +60,8 @@ export const LEVELS: readonly LevelConfig[] = [
       },
       {
         id: 'tue-planning',
-        typeId: 'sprint-planning',
-        title: 'Sprint Planning',
+        typeId: 'corporate-training',
+        title: 'Corporate Training',
         day: 'tuesday',
         startMinutes: 600,
         durationMinutes: 120,
@@ -80,8 +80,8 @@ export const LEVELS: readonly LevelConfig[] = [
       },
       {
         id: 'tue-architecture',
-        typeId: 'architecture-review',
-        title: 'Architecture Review',
+        typeId: 'go-no-go',
+        title: 'Go / No-Go',
         day: 'tuesday',
         startMinutes: 900,
         durationMinutes: 60,
@@ -100,8 +100,8 @@ export const LEVELS: readonly LevelConfig[] = [
       },
       {
         id: 'wed-no-agenda',
-        typeId: 'meeting-without-agenda',
-        title: 'Meeting Without Agenda',
+        typeId: 'incident-call',
+        title: 'Incident Call',
         day: 'wednesday',
         startMinutes: 600,
         durationMinutes: 60,
@@ -110,8 +110,8 @@ export const LEVELS: readonly LevelConfig[] = [
       },
       {
         id: 'wed-refinement',
-        typeId: 'refinement',
-        title: 'Task Estimation',
+        typeId: 'recurring-meeting',
+        title: 'Recurring Meeting',
         day: 'wednesday',
         startMinutes: 690,
         durationMinutes: 60,
@@ -140,33 +140,36 @@ export const LEVELS: readonly LevelConfig[] = [
       },
       {
         id: 'thu-one-to-one',
-        typeId: 'one-to-one',
-        title: 'One-to-One',
+        typeId: 'preparation-meeting',
+        title: 'Preparation Meeting',
         day: 'thursday',
         startMinutes: 600,
         durationMinutes: 30,
         attendeeCount: 2,
         required: true,
+        groupId: 'stakeholder-prep',
       },
       {
         id: 'thu-architecture',
-        typeId: 'architecture-review',
-        title: 'Technical Design Review',
+        typeId: 'stakeholder-meeting',
+        title: 'Stakeholder Meeting',
         day: 'thursday',
         startMinutes: 660,
         durationMinutes: 60,
         attendeeCount: 7,
         required: true,
+        linkedMeetingIds: ['thu-one-to-one'],
       },
       {
         id: 'thu-sync',
-        typeId: 'team-sync',
+        typeId: 'cross-team-sync',
         title: 'Cross-Team Sync',
         day: 'thursday',
         startMinutes: 780,
         durationMinutes: 30,
         attendeeCount: 14,
         required: true,
+        groupId: 'cross-team-a',
       },
       {
         id: 'fri-daily',
@@ -200,13 +203,14 @@ export const LEVELS: readonly LevelConfig[] = [
       },
       {
         id: 'fri-sync',
-        typeId: 'team-sync',
+        typeId: 'cross-team-sync',
         title: 'Weekly Team Status',
         day: 'friday',
         startMinutes: 840,
         durationMinutes: 30,
         attendeeCount: 10,
         required: true,
+        groupId: 'cross-team-a',
       },
       {
         id: 'fri-all-hands',
@@ -221,6 +225,18 @@ export const LEVELS: readonly LevelConfig[] = [
     ],
   },
 ];
+
+const BASE_LEVEL = BASE_LEVELS[0];
+if (!BASE_LEVEL) throw new Error('At least one level must be configured');
+const WEEK_TITLES = ['Неделя 1 · Calendar Overload', 'Неделя 2 · Синхронизация', 'Неделя 3 · Эскалация', 'Неделя 4 · Решения', 'Финальная неделя · All Hands'] as const;
+export const LEVELS: readonly LevelConfig[] = WEEK_TITLES.map((title, index) => ({
+  ...BASE_LEVEL,
+  id: index === 0 ? BASE_LEVEL.id : `month-week-${index + 1}`,
+  title,
+  description: index === 4 ? 'Финальная неделя месяца с All Hands Boss.' : `Рабочая неделя ${index + 1} из 5.`,
+  initialBallSpeed: BASE_LEVEL.initialBallSpeed + index * 18,
+  meetings: BASE_LEVEL.meetings.map((meeting) => ({ ...meeting, id: index === 0 ? meeting.id : `w${index + 1}-${meeting.id}` })),
+}));
 
 export const DEFAULT_LEVEL = LEVELS[0];
 

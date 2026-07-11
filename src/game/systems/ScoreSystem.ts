@@ -47,6 +47,7 @@ export class ScoreSystem {
   private destroyedMeetings = 0;
   private combo = 0;
   private maxCombo = 0;
+  constructor(private readonly modeMultiplier = 1) {}
 
   registerMeetingDestroyed(
     meeting: Pick<MeetingDestroyedPayload, 'score' | 'freedMinutes'>,
@@ -56,7 +57,7 @@ export class ScoreSystem {
     this.destroyedMeetings += 1;
     this.freedMinutes += meeting.freedMinutes;
     this.score += Math.round(
-      meeting.score * calculateComboMultiplier(this.combo),
+      meeting.score * calculateComboMultiplier(this.combo) * this.modeMultiplier,
     );
 
     return this.snapshot;
@@ -74,7 +75,7 @@ export class ScoreSystem {
       destroyedMeetings: this.destroyedMeetings,
       combo: this.combo,
       maxCombo: this.maxCombo,
-      multiplier: calculateComboMultiplier(this.combo),
+      multiplier: calculateComboMultiplier(this.combo) * this.modeMultiplier,
     };
   }
 

@@ -48,6 +48,10 @@ describe('storageService', () => {
       soundEnabled: false,
       volume: 0.25,
       theme: 'light',
+      musicEnabled: true,
+      musicVolume: 0.45,
+      meetingPalette: 'default',
+      language: 'ru',
     });
   });
 

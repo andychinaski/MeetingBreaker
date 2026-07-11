@@ -16,9 +16,30 @@ export type MeetingCategory =
   | 'technical'
   | 'one-to-one'
   | 'useless'
-  | 'all-hands';
+  | 'all-hands'
+  | 'status'
+  | 'review'
+  | 'training'
+  | 'incident'
+  | 'recurring'
+  | 'retrospective'
+  | 'stakeholder'
+  | 'decision'
+  | 'postmortem'
+  | 'action-item'
+  | 'preparation';
 
-export type MeetingEffect = 'moving' | 'replicating';
+export type MeetingBehaviorId =
+  | 'moving'
+  | 'blinking'
+  | 'recurring'
+  | 'split'
+  | 'shielded'
+  | 'linked'
+  | 'accelerating'
+  | 'slow-field'
+  | 'timed'
+  | 'bonus-drop';
 
 export interface MeetingType {
   id: string;
@@ -26,11 +47,13 @@ export interface MeetingType {
   shortTitle: string;
   category: MeetingCategory;
   color: string;
+  colorToken?: string;
   maxHp: number;
   score: number;
   freedMinutes: number;
   dropChance: number;
-  specialEffect?: MeetingEffect;
+  behaviorIds?: MeetingBehaviorId[];
+  behaviorConfig?: Record<string, unknown>;
 }
 
 export interface MeetingBlockConfig {
@@ -43,4 +66,9 @@ export interface MeetingBlockConfig {
   attendeeCount?: number;
   customHp?: number;
   required?: boolean;
+  groupId?: string;
+  linkedMeetingIds?: string[];
+  behaviorConfig?: Record<string, unknown>;
+  generation?: number;
+  scoreMultiplier?: number;
 }

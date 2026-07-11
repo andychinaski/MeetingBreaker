@@ -88,6 +88,70 @@ export const MEETING_TYPES = {
     score: 1500,
     freedMinutes: 120,
     dropChance: 0.3,
+    behaviorIds: ['timed', 'shielded', 'split'],
+    behaviorConfig: { phases: 3, childTypeId: 'project-status' },
+  },
+  projectStatus: {
+    id: 'project-status', title: 'Project Status', shortTitle: 'Status', category: 'status',
+    color: '#38bdf8', maxHp: 2, score: 320, freedMinutes: 30, dropChance: 0.12,
+  },
+  sprintReview: {
+    id: 'sprint-review', title: 'Sprint Review', shortTitle: 'Review', category: 'review',
+    color: '#818cf8', maxHp: 2, score: 520, freedMinutes: 60, dropChance: 0.16,
+  },
+  performanceReview: {
+    id: 'performance-review', title: 'Performance Review', shortTitle: 'Performance', category: 'review',
+    color: '#2dd4bf', maxHp: 3, score: 650, freedMinutes: 45, dropChance: 0.38,
+    behaviorIds: ['bonus-drop'], behaviorConfig: { bonusType: 'espresso-shot' },
+  },
+  corporateTraining: {
+    id: 'corporate-training', title: 'Corporate Training', shortTitle: 'Training', category: 'training',
+    color: '#a78bfa', maxHp: 3, score: 900, freedMinutes: 120, dropChance: 0.2,
+    behaviorIds: ['slow-field'], behaviorConfig: { fieldModifier: 0.72 },
+  },
+  stakeholderMeeting: {
+    id: 'stakeholder-meeting', title: 'Stakeholder Meeting', shortTitle: 'Stakeholders', category: 'stakeholder',
+    color: '#f59e0b', maxHp: 4, score: 1200, freedMinutes: 90, dropChance: 0.24,
+    behaviorIds: ['shielded'],
+  },
+  preparationMeeting: {
+    id: 'preparation-meeting', title: 'Preparation Meeting', shortTitle: 'Preparation', category: 'preparation',
+    color: '#22d3ee', maxHp: 1, score: 180, freedMinutes: 15, dropChance: 0.08,
+  },
+  incidentCall: {
+    id: 'incident-call', title: 'Incident Call', shortTitle: 'Incident!', category: 'incident',
+    color: '#ef4444', maxHp: 2, score: 1000, freedMinutes: 60, dropChance: 0.35,
+    behaviorIds: ['moving', 'blinking', 'accelerating', 'bonus-drop'],
+    behaviorConfig: { moveSpeed: 34, moveRange: 32, acceleration: 1.12 },
+  },
+  recurringMeeting: {
+    id: 'recurring-meeting', title: 'Recurring Meeting', shortTitle: '↻ Recurring', category: 'recurring',
+    color: '#fb7185', maxHp: 1, score: 450, freedMinutes: 30, dropChance: 0.12,
+    behaviorIds: ['recurring'], behaviorConfig: { maxGenerations: 2, rewardMultiplier: 0.5 },
+  },
+  retrospective: {
+    id: 'retrospective', title: 'Retrospective', shortTitle: 'Retro', category: 'retrospective',
+    color: '#c084fc', maxHp: 2, score: 700, freedMinutes: 60, dropChance: 0.16,
+    behaviorIds: ['split'], behaviorConfig: { childTypeId: 'action-item', minChildren: 2, maxChildren: 3 },
+  },
+  actionItem: {
+    id: 'action-item', title: 'Action Item', shortTitle: 'Action', category: 'action-item',
+    color: '#f0abfc', maxHp: 1, score: 140, freedMinutes: 10, dropChance: 0.04,
+  },
+  crossTeamSync: {
+    id: 'cross-team-sync', title: 'Cross-Team Sync', shortTitle: 'Cross-Team', category: 'sync',
+    color: '#34d399', maxHp: 2, score: 600, freedMinutes: 45, dropChance: 0.14,
+    behaviorIds: ['linked'], behaviorConfig: { damageMultiplier: 0.5 },
+  },
+  goNoGo: {
+    id: 'go-no-go', title: 'Go / No-Go', shortTitle: 'Go/No-Go', category: 'decision',
+    color: '#facc15', maxHp: 3, score: 1100, freedMinutes: 60, dropChance: 0.22,
+    behaviorIds: ['timed', 'blinking'], behaviorConfig: { phaseInterval: 1800 },
+  },
+  postmortem: {
+    id: 'postmortem', title: 'Postmortem', shortTitle: 'Postmortem', category: 'postmortem',
+    color: '#f97316', maxHp: 4, score: 1400, freedMinutes: 90, dropChance: 0.28,
+    behaviorIds: ['split', 'timed'], behaviorConfig: { childTypeId: 'incident-call', maxChildren: 2 },
   },
 } as const satisfies Record<string, MeetingType>;
 

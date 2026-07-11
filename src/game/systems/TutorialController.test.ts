@@ -1,0 +1,3 @@
+import { describe, expect, it } from 'vitest';
+import { TutorialController } from './TutorialController';
+describe('TutorialController', () => { it('advances once only for the expected event', () => { const tutorial = new TutorialController([{ id: 'move', message: 'Move', waitForEvent: 'paddle-moved' }, { id: 'launch', message: 'Launch', waitForEvent: 'ball-launched' }]); expect(tutorial.notify('ball-launched')).toBe(false); expect(tutorial.notify('paddle-moved')).toBe(true); expect(tutorial.notify('paddle-moved')).toBe(false); expect(tutorial.current?.id).toBe('launch'); }); it('can be skipped', () => { const tutorial = new TutorialController(); tutorial.skip(); expect(tutorial.isCompleted).toBe(true); }); });

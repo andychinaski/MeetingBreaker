@@ -25,6 +25,11 @@ export class LevelProgress {
     return false;
   }
 
+  addRequired(meetingIds: readonly string[]): void {
+    meetingIds.forEach((id) => this.remainingRequiredMeetings.add(id));
+    if (meetingIds.length > 0) this.completed = false;
+  }
+
   get remainingRequired(): number {
     return this.remainingRequiredMeetings.size;
   }

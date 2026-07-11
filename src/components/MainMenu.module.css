@@ -82,6 +82,12 @@
   gap: 10px;
 }
 
+.modeGrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+.modeCard { display: grid; gap: 8px; padding: 20px; border: 1px solid var(--color-border); border-radius: 14px; color: var(--color-text); text-align: left; background: var(--color-background); cursor: pointer; }
+.modeCard:hover, .modeCard:focus-visible { border-color: var(--color-accent); transform: translateY(-2px); }
+.modeCard span { color: var(--color-text-muted); line-height: 1.45; }
+@media (max-width: 700px) { .modeGrid { grid-template-columns: 1fr; } }
+
 .startButton,
 .settingsButton {
   padding: 12px 18px;

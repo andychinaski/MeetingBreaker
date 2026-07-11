@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DEFAULT_LEVEL } from '../../data/levels';
+import { DEFAULT_LEVEL, LEVELS } from '../../data/levels';
 import { getMeetingType } from '../../data/meetingTypes';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config/gameConfig';
 import {
@@ -24,6 +24,7 @@ import {
   type GameStartedPayload,
   type LevelCompletedPayload,
   type MeetingDestroyedPayload,
+  type MeetingBehaviorActionPayload,
   type PauseChangedPayload,
   type ScoreChangedPayload,
 } from '../events/gameEvents';
@@ -42,6 +43,7 @@ import {
 import { CoffeeSystem } from '../systems/CoffeeSystem';
 import { LevelProgress } from '../systems/LevelProgress';
 import { ScoreSystem } from '../systems/ScoreSystem';
+import { EndlessMeetingGenerator } from '../systems/EndlessMeetingGenerator';
 import {
   ESPRESSO_DURATION_MS,
   PowerUpSystem,
@@ -58,6 +60,10 @@ import {
   SETTINGS_REGISTRY_KEY,
   type UserSettings,
 } from '../../services/storageService';
+import { GAME_MODES, LEVEL_REGISTRY_KEY, MODE_REGISTRY_KEY, TUTORIAL_REGISTRY_KEY, type GameModeConfig } from '../types/mode';
+import type { MeetingBlockConfig, WorkDay } from '../types/meeting';
+import type { LevelConfig } from '../types/level';
+import { TutorialController, type TutorialEvent } from '../systems/TutorialController';
 
 const COFFEE_LOSS_MESSAGES: string[] = [
   'Задача потеряна. Пора за кофе.',
@@ -90,6 +96,13 @@ export class GameScene extends Phaser.Scene {
   private espressoTimer?: Phaser.Time.TimerEvent;
   private soundSystem!: SoundSystem;
   private gameStatus: GameStatus = 'idle';
+  private mode: GameModeConfig = GAME_MODES.campaign;
+  private level: LevelConfig = DEFAULT_LEVEL;
+  private endlessGenerator?: EndlessMeetingGenerator;
+  private waveTimer?: Phaser.Time.TimerEvent;
+  private createdMeetingCount = 0;
+  private tutorialController?: TutorialController;
+  private tutorialText?: Phaser.GameObjects.Text;
 
   constructor() {
     super('GameScene');
@@ -116,6 +129,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.updateKeyboardMovement(delta);
+    this.meetingBlocks.forEach((block) => block.updateBehavior(delta));
+    if (this.mode.endless) this.scheduleEndlessWave();
 
     for (const powerUp of [...this.powerUps]) {
       powerUp.syncLabel();
@@ -133,7 +148,7 @@ export class GameScene extends Phaser.Scene {
 
     for (const ball of [...this.activeBalls]) {
       ball.setSafeVelocity(
-        accelerateVelocity(ball.getVelocity(), delta / 1000),
+        this.mode.ballAccelerationEnabled ? accelerateVelocity(ball.getVelocity(), delta / 1000) : ball.getVelocity(),
         this.launchDirection,
       );
       ball.syncLabel();
@@ -165,10 +180,15 @@ export class GameScene extends Phaser.Scene {
   }
 
   private initializeGameState(): void {
-    this.scoreSystem = new ScoreSystem();
-    this.coffeeSystem = new CoffeeSystem(DEFAULT_LEVEL.initialCoffeeCups);
+    const modeId = this.game.registry.get(MODE_REGISTRY_KEY) as GameModeConfig['id'] | undefined;
+    this.mode = GAME_MODES[modeId ?? 'campaign'];
+    this.tutorialController = this.game.registry.get(TUTORIAL_REGISTRY_KEY) ? new TutorialController() : undefined;
+    const levelId = this.game.registry.get(LEVEL_REGISTRY_KEY) as string | undefined;
+    this.level = LEVELS.find((level) => level.id === levelId) ?? DEFAULT_LEVEL;
+    this.scoreSystem = new ScoreSystem(this.mode.scoreMultiplier);
+    this.coffeeSystem = new CoffeeSystem(this.mode.coffeeEnabled ? (this.mode.initialCoffeeCups ?? this.level.initialCoffeeCups) : 1);
     this.levelProgress = new LevelProgress(
-      DEFAULT_LEVEL.meetings
+      this.level.meetings
         .filter((meeting) => meeting.required ?? true)
         .map((meeting) => meeting.id),
     );
@@ -178,14 +198,20 @@ export class GameScene extends Phaser.Scene {
       DEFAULT_SETTINGS,
     );
     this.powerUps.length = 0;
+    this.endlessGenerator = this.mode.endless ? new EndlessMeetingGenerator(this.mode) : undefined;
+    this.createdMeetingCount = 0;
     this.gameStatus = 'playing';
+    if (this.tutorialController) {
+      this.tutorialText = this.add.text(GAME_WIDTH / 2, 82, '', { color: '#f8fafc', backgroundColor: '#0f172add', padding: { x: 16, y: 10 }, fontSize: '17px', fontStyle: 'bold', wordWrap: { width: 720 } }).setOrigin(0.5).setDepth(50);
+      this.publishTutorialStep();
+    }
   }
 
   private createCalendar(): void {
     this.meetingBlocks.length = 0;
     new CalendarGrid(this, DEFAULT_CALENDAR_LAYOUT);
 
-    for (const meetingConfig of DEFAULT_LEVEL.meetings) {
+    for (const meetingConfig of this.level.meetings) {
       const meetingType = getMeetingType(meetingConfig.typeId);
       const rectangle = calculateMeetingRect(
         meetingConfig,
@@ -194,6 +220,7 @@ export class GameScene extends Phaser.Scene {
       this.meetingBlocks.push(
         new MeetingBlock(this, meetingConfig, meetingType, rectangle),
       );
+      this.createdMeetingCount += 1;
     }
 
     this.game.canvas.dataset.calendarReady = 'true';
@@ -233,17 +260,43 @@ export class GameScene extends Phaser.Scene {
     });
 
     for (const meetingBlock of this.meetingBlocks) {
-      this.physics.add.collider(ball, meetingBlock.collisionZone, () => {
-        const declineUsed = this.powerUpSystem.consumeDecline();
-        const damage = meetingBlock.takeDamage(
-          declineUsed ? meetingBlock.currentHp : 1,
-        );
-        this.soundSystem.play(damage.destroyedNow ? 'destroy' : 'meeting');
-        if (declineUsed) {
-          this.publishActivePowerUps();
-        }
-      });
+      this.configureMeetingCollision(ball, meetingBlock);
     }
+  }
+
+  private configureMeetingCollision(ball: Ball, meetingBlock: MeetingBlock): void {
+    this.physics.add.collider(ball, meetingBlock.collisionZone, () => {
+      const declineUsed = this.powerUpSystem.consumeDecline();
+      const damage = meetingBlock.takeDamage(declineUsed ? meetingBlock.currentHp : 1);
+      this.soundSystem.play(damage.destroyedNow ? 'destroy' : 'meeting');
+      if (declineUsed) this.publishActivePowerUps();
+    });
+  }
+
+  private scheduleEndlessWave(): void {
+    if (this.waveTimer || !this.endlessGenerator || this.createdMeetingCount >= 100) return;
+    const active = this.meetingBlocks.filter((block) => !block.destroyed);
+    if (active.length > 5) return;
+    this.game.canvas.dataset.waveWarning = 'true';
+    this.waveTimer = this.time.delayedCall(3_000, () => {
+      this.waveTimer = undefined;
+      if (this.gameStatus !== 'playing' || !this.endlessGenerator) return;
+      const occupied = this.meetingBlocks.filter((block) => !block.destroyed).map((block) => block.config);
+      const wave = this.endlessGenerator.createWave(occupied);
+      const configs = wave.meetings.slice(0, 100 - this.createdMeetingCount);
+      this.levelProgress.addRequired(configs.map((config) => config.id));
+      for (const config of configs) {
+        const meetingType = getMeetingType(config.typeId);
+        config.title = meetingType.title;
+        const block = new MeetingBlock(this, config, meetingType, calculateMeetingRect(config, DEFAULT_CALENDAR_LAYOUT));
+        this.meetingBlocks.push(block);
+        this.activeBalls.forEach((ball) => this.configureMeetingCollision(ball, block));
+        this.createdMeetingCount += 1;
+      }
+      this.game.canvas.dataset.wave = wave.wave.toString();
+      this.game.canvas.dataset.waveWarning = 'false';
+      this.game.canvas.dataset.meetingCount = this.meetingBlocks.filter((block) => !block.destroyed).length.toString();
+    });
   }
 
   private configureGameEvents(): void {
@@ -262,6 +315,40 @@ export class GameScene extends Phaser.Scene {
       this.handleTogglePause,
       this,
     );
+    this.game.events.on(GAME_EVENTS.MEETING_BEHAVIOR_ACTION, this.handleBehaviorAction, this);
+  }
+
+  private readonly handleBehaviorAction = (payload: MeetingBehaviorActionPayload): void => {
+    if (this.gameStatus !== 'playing') return;
+    if (payload.action === 'accelerate-ball') {
+      this.activeBalls.forEach((ball) => ball.setSafeVelocity(accelerateVelocity(ball.getVelocity(), Number(payload.config.acceleration ?? 1.12) - 1)));
+      return;
+    }
+    const source = this.meetingBlocks.find((block) => block.config.id === payload.meetingId);
+    if (!source) return;
+    if (payload.action === 'spawn-recurring') {
+      this.spawnBehaviorMeetings(source.config.typeId, 1, source.config.generation === undefined ? 1 : source.config.generation + 1, 0.5);
+    } else if (payload.action === 'spawn-children') {
+      const minimum = Number(payload.config.minChildren ?? 2);
+      const maximum = Number(payload.config.maxChildren ?? minimum);
+      const count = Phaser.Math.Between(minimum, maximum);
+      this.spawnBehaviorMeetings(String(payload.config.childTypeId ?? 'action-item'), count, 0, 1);
+    }
+  };
+
+  private spawnBehaviorMeetings(typeId: string, count: number, generation: number, scoreMultiplier: number): void {
+    const days: WorkDay[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+    const occupied = this.meetingBlocks.filter((block) => !block.destroyed).map((block) => `${block.config.day}-${block.config.startMinutes}`);
+    const free: Array<{ day: WorkDay; startMinutes: number }> = [];
+    for (const day of days) for (let startMinutes = 540; startMinutes <= 990; startMinutes += 30) if (!occupied.includes(`${day}-${startMinutes}`)) free.push({ day, startMinutes });
+    const meetingType = getMeetingType(typeId);
+    free.slice(0, Math.min(count, 3)).forEach((slot, index) => {
+      const config: MeetingBlockConfig = { id: `${typeId}-${this.time.now}-${index}`, typeId, title: generation > 0 ? `↻ ${meetingType.title}` : meetingType.title, ...slot, durationMinutes: 30, required: true, generation, scoreMultiplier };
+      const block = new MeetingBlock(this, config, meetingType, calculateMeetingRect(config, DEFAULT_CALENDAR_LAYOUT));
+      this.meetingBlocks.push(block);
+      this.levelProgress.addRequired([config.id]);
+      this.activeBalls.forEach((ball) => this.configureMeetingCollision(ball, block));
+    });
   }
 
   private updateKeyboardMovement(delta: number): void {
@@ -314,6 +401,7 @@ export class GameScene extends Phaser.Scene {
       GAME_WIDTH - WORLD_PADDING - halfWidth,
     );
     this.game.canvas.dataset.paddleX = Math.round(this.paddle.x).toString();
+    this.advanceTutorial('paddle-moved');
   }
 
   private launchBall(): void {
@@ -335,6 +423,7 @@ export class GameScene extends Phaser.Scene {
     this.activeBalls.push(this.ball);
     this.ballLaunched = true;
     this.setCanvasState('launched');
+    this.advanceTutorial('ball-launched');
   }
 
   private handlePaddleCollision(ball: Ball): void {
@@ -411,6 +500,12 @@ export class GameScene extends Phaser.Scene {
     this.recentPaddleImpacts.length = 0;
     this.launchDirection = this.launchDirection === 1 ? -1 : 1;
     this.setCanvasState('resetting');
+    this.advanceTutorial('ball-lost');
+
+    if (!this.mode.coffeeEnabled) {
+      this.finishWithDefeat();
+      return;
+    }
 
     if (this.scoreSystem.snapshot.combo > 0) {
       this.publishScore(this.scoreSystem.resetCombo());
@@ -457,10 +552,21 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
+    if (payload.typeId === 'incident-call' && !this.meetingBlocks.some((block) => block.meetingType.id === 'postmortem')) {
+      this.spawnBehaviorMeetings('postmortem', 1, 0, 1);
+    }
+
     this.publishScore(this.scoreSystem.registerMeetingDestroyed(payload));
-    if (Math.random() < payload.dropChance) {
+    this.advanceTutorial('meeting-destroyed');
+    if (getMeetingType(payload.typeId).maxHp > 1) this.advanceTutorial('durable-meeting-destroyed');
+    this.advanceTutorial('score-changed');
+    if (this.scoreSystem.snapshot.combo > 1) this.advanceTutorial('combo-changed');
+    if (Math.random() < payload.dropChance * this.mode.bonusDropMultiplier) {
       this.spawnPowerUp(payload.x, payload.y);
     }
+    this.meetingBlocks.forEach((block) => {
+      if (block.config.linkedMeetingIds?.includes(payload.meetingId) || (block.config.groupId && block.config.groupId === this.meetingBlocks.find((candidate) => candidate.config.id === payload.meetingId)?.config.groupId)) block.removeShield();
+    });
     const completedNow = this.levelProgress.registerDestroyed(
       payload.meetingId,
       payload.required,
@@ -468,8 +574,10 @@ export class GameScene extends Phaser.Scene {
     this.game.canvas.dataset.requiredMeetings =
       this.levelProgress.remainingRequired.toString();
 
-    if (completedNow) {
+    if (completedNow && !this.mode.endless) {
       this.finishWithVictory();
+    } else if (completedNow) {
+      this.scheduleEndlessWave();
     }
   };
 
@@ -485,6 +593,7 @@ export class GameScene extends Phaser.Scene {
       this.game.canvas.dataset.paused = 'true';
       const payload: PauseChangedPayload = { paused: true };
       this.game.events.emit(GAME_EVENTS.PAUSE_CHANGED, payload);
+      this.advanceTutorial('paused');
       this.scene.pause();
       return;
     }
@@ -525,6 +634,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.publishActivePowerUps(type);
+    this.advanceTutorial(type === 'espresso-shot' ? 'espresso-collected' : type === 'decline' ? 'decline-collected' : 'async-collected');
   }
 
   private addAsyncBall(): void {
@@ -596,6 +706,7 @@ export class GameScene extends Phaser.Scene {
   private finishWithVictory(): void {
     this.gameStatus = 'won';
     this.soundSystem.play('victory');
+    this.advanceTutorial('level-completed');
     this.stopGameplay('level-completed');
     const payload: LevelCompletedPayload = {
       result: this.scoreSystem.createLevelResult(
@@ -632,11 +743,12 @@ export class GameScene extends Phaser.Scene {
 
   private publishGameStarted(): void {
     const payload: GameStartedPayload = {
-      levelId: DEFAULT_LEVEL.id,
-      levelTitle: DEFAULT_LEVEL.title,
+      levelId: this.level.id,
+      levelTitle: this.mode.endless ? `${this.mode.id === 'hard' ? 'Hard' : 'Relax'} Endless` : this.level.title,
       score: this.scoreSystem.snapshot,
       coffeeCups: this.coffeeSystem.coffeeCups,
       initialCoffeeCups: this.coffeeSystem.initialCoffeeCups,
+      coffeeEnabled: this.mode.coffeeEnabled,
     };
     this.updateRegistryState();
     this.game.events.emit(GAME_EVENTS.GAME_STARTED, payload);
@@ -645,6 +757,24 @@ export class GameScene extends Phaser.Scene {
   private publishScore(score: ScoreChangedPayload): void {
     this.updateRegistryState();
     this.game.events.emit(GAME_EVENTS.SCORE_CHANGED, score);
+  }
+
+  private advanceTutorial(event: TutorialEvent): void {
+    if (this.tutorialController?.notify(event)) this.publishTutorialStep();
+  }
+
+  private publishTutorialStep(): void {
+    const step = this.tutorialController?.current;
+    this.game.canvas.dataset.tutorialStep = step?.id ?? 'completed';
+    if (this.tutorialText) {
+      this.tutorialText.setText(step?.message ?? '').setVisible(Boolean(step));
+    }
+    if (step && ['espresso', 'decline', 'async'].includes(step.id) && this.paddle) {
+      const type = step.id === 'espresso' ? 'espresso-shot' : step.id === 'decline' ? 'decline' : 'async-mode';
+      const powerUp = new PowerUp(this, this.paddle.x, this.paddle.y - 55, type);
+      this.powerUps.push(powerUp);
+      this.physics.add.overlap(powerUp, this.paddle, () => this.activatePowerUp(powerUp));
+    }
   }
 
   private updateRegistryState(): void {
@@ -694,6 +824,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private cleanupScene(): void {
+    this.waveTimer?.remove(false);
     this.espressoTimer?.remove(false);
     this.soundSystem.destroy();
     this.game.canvas.removeEventListener(
@@ -720,6 +851,7 @@ export class GameScene extends Phaser.Scene {
       this.handleTogglePause,
       this,
     );
+    this.game.events.off(GAME_EVENTS.MEETING_BEHAVIOR_ACTION, this.handleBehaviorAction, this);
     delete this.game.canvas.dataset.ballState;
     delete this.game.canvas.dataset.activeBalls;
     delete this.game.canvas.dataset.calendarReady;
@@ -733,5 +865,8 @@ export class GameScene extends Phaser.Scene {
     delete this.game.canvas.dataset.requiredMeetings;
     delete this.game.canvas.dataset.score;
     delete this.game.canvas.dataset.scene;
+    delete this.game.canvas.dataset.wave;
+    delete this.game.canvas.dataset.waveWarning;
+    delete this.game.canvas.dataset.tutorialStep;
   }
 }

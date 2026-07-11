@@ -10,6 +10,7 @@ export const GAME_EVENTS = {
   PAUSE_CHANGED: 'PAUSE_CHANGED',
   LEVEL_COMPLETED: 'LEVEL_COMPLETED',
   GAME_OVER: 'GAME_OVER',
+  MEETING_BEHAVIOR_ACTION: 'MEETING_BEHAVIOR_ACTION',
 } as const;
 
 export const GAME_COMMANDS = {
@@ -25,6 +26,7 @@ export interface GameStartedPayload {
   score: ScoreSnapshot;
   coffeeCups: number;
   initialCoffeeCups: number;
+  coffeeEnabled?: boolean;
 }
 
 export type ScoreChangedPayload = ScoreSnapshot;
@@ -65,4 +67,13 @@ export interface LevelCompletedPayload {
 
 export interface GameOverPayload {
   result: LevelResult;
+}
+
+export interface MeetingBehaviorActionPayload {
+  action: 'spawn-recurring' | 'spawn-children' | 'accelerate-ball' | 'neighbor-destroyed';
+  meetingId: string;
+  typeId: string;
+  config: Record<string, unknown>;
+  x: number;
+  y: number;
 }

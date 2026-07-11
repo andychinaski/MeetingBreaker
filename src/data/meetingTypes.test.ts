@@ -3,8 +3,8 @@ import { DEFAULT_LEVEL } from './levels';
 import { getMeetingType, MEETING_TYPE_LIST } from './meetingTypes';
 
 describe('meeting configuration', () => {
-  it('defines all eight MVP meeting types', () => {
-    expect(MEETING_TYPE_LIST).toHaveLength(8);
+  it('keeps the MVP types and adds the post-MVP meeting set', () => {
+    expect(MEETING_TYPE_LIST.length).toBeGreaterThanOrEqual(21);
   });
 
   it('defines at least twenty meetings for the MVP level', () => {

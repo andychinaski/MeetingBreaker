@@ -8,15 +8,22 @@ import {
   type UserSettings,
 } from '../services/storageService';
 import styles from './GameCanvas.module.css';
+import type { GameModeId } from '../game/types/mode';
 
 interface GameCanvasProps {
   settings: UserSettings;
+  mode: GameModeId;
+  tutorial: boolean;
+  levelId: string;
   onExitToMenu: () => void;
   onLevelResult: (result: LevelResult) => void;
 }
 
 export function GameCanvas({
   settings,
+  mode,
+  tutorial,
+  levelId,
   onExitToMenu,
   onLevelResult,
 }: GameCanvasProps) {
@@ -31,15 +38,14 @@ export function GameCanvas({
       return;
     }
 
-    const game = new Phaser.Game(createGameConfig(container));
-    game.registry.set(SETTINGS_REGISTRY_KEY, initialSettings.current);
+    const game = new Phaser.Game(createGameConfig(container, initialSettings.current, mode, tutorial, levelId));
     setGame(game);
 
     return () => {
       game.destroy(true);
       setGame(null);
     };
-  }, []);
+  }, [levelId, mode, tutorial]);
 
   useEffect(() => {
     game?.registry.set(SETTINGS_REGISTRY_KEY, settings);

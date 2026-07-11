@@ -1,15 +1,36 @@
 import { expect, test, type Page } from '@playwright/test';
 
 async function startGame(page: Page) {
+  await page.addInitScript(() => {
+    if (!localStorage.getItem('meeting-breaker-profile')) {
+      localStorage.setItem('meeting-breaker-profile', JSON.stringify({ version: 2, preferences: { playerName: 'Тестер', controlScheme: 'keyboard', tutorialCompleted: true }, settings: {}, progress: { unlockedLevelIds: ['calendar-overload'] }, leaderboard: [] }));
+    }
+  });
   await page.goto('/');
   await expect(page.getByLabel('Главное меню')).toBeVisible();
   await expect(page.locator('canvas')).toHaveCount(0);
-  await page.getByRole('button', { name: 'Начать работу' }).click();
+  await page.getByRole('button', { name: 'Играть' }).click();
+  await page.getByRole('button', { name: /Прохождение/ }).click();
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveCount(1);
   await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
   return canvas;
 }
+
+test('first run validates the player and opens mode selection', async ({ page }) => {
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Играть' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Первый запуск' });
+  await expect(dialog.getByRole('button', { name: 'Далее' })).toBeDisabled();
+  await dialog.getByLabel(/Имя игрока/).fill('  Алекс  ');
+  await dialog.getByRole('button', { name: 'Далее' }).click();
+  await dialog.getByText('Нет, сразу в календарь').click();
+  await dialog.getByRole('button', { name: 'Далее' }).click();
+  await dialog.getByText('Мышь').click();
+  await dialog.getByRole('button', { name: 'Готово' }).click();
+  await expect(page.getByRole('heading', { name: 'Как ломаем календарь?' })).toBeVisible();
+  await expect(page.locator('canvas')).toHaveCount(0);
+});
 
 test('opens the calendar level and launches the ball', async ({ page }) => {
   const browserErrors: string[] = [];
@@ -131,10 +152,11 @@ test('pause stops timers and supports resume, R, restart and exit', async ({
     .getByRole('button', { name: 'Закончить рабочую неделю' })
     .click();
   await expect(
-    page.getByRole('button', { name: 'Начать работу' }),
+    page.getByRole('button', { name: 'Играть' }),
   ).toBeVisible();
 
-  await page.getByRole('button', { name: 'Начать работу' }).click();
+  await page.getByRole('button', { name: 'Играть' }).click();
+  await page.getByRole('button', { name: /Прохождение/ }).click();
   await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
   await expect(canvas).toHaveAttribute('data-paused', 'false');
 });
@@ -191,6 +213,7 @@ test('coffee defeat supports scoring and restart', async ({ page }) => {
 });
 
 test('menu delays Phaser creation and persists settings', async ({ page }) => {
+  await page.addInitScript(() => { if (!localStorage.getItem('meeting-breaker-profile')) localStorage.setItem('meeting-breaker-profile', JSON.stringify({ version: 2, preferences: { playerName: 'Тестер', controlScheme: 'keyboard', tutorialCompleted: true }, settings: {}, progress: { unlockedLevelIds: ['calendar-overload'] }, leaderboard: [] })); });
   await page.goto('/');
 
   await expect(page.getByLabel('Главное меню')).toBeVisible();
@@ -212,7 +235,8 @@ test('menu delays Phaser creation and persists settings', async ({ page }) => {
   await expect(page.getByLabel('Звук включён')).not.toBeChecked();
   await page.getByRole('button', { name: 'Отмена' }).click();
 
-  await page.getByRole('button', { name: 'Начать работу' }).click();
+  await page.getByRole('button', { name: 'Играть' }).click();
+  await page.getByRole('button', { name: /Прохождение/ }).click();
   await expect(page.locator('canvas')).toHaveCount(1);
   await page.getByRole('button', { name: 'Пауза' }).click();
   await page
@@ -221,7 +245,8 @@ test('menu delays Phaser creation and persists settings', async ({ page }) => {
     .click();
   await expect(page.locator('canvas')).toHaveCount(0);
 
-  await page.getByRole('button', { name: 'Начать работу' }).click();
+  await page.getByRole('button', { name: 'Играть' }).click();
+  await page.getByRole('button', { name: /Прохождение/ }).click();
   await expect(page.locator('canvas')).toHaveCount(1);
 });
 

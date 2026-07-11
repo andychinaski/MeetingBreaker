@@ -2,13 +2,19 @@ import type { LevelConfig } from '../game/types/level';
 import { formatFreedTime } from '../game/systems/ScoreSystem';
 import type { PlayerProgress } from '../services/storageService';
 import styles from './MainMenu.module.css';
+import { t } from '../services/i18n';
+import type { Language } from '../services/storageService';
 
 interface MainMenuProps {
   levels: readonly LevelConfig[];
   selectedLevelId: string;
   progress: PlayerProgress;
   onSelectLevel: (levelId: string) => void;
+  playerName: string | null;
+  language: Language;
   onStart: () => void;
+  onLeaderboard: () => void;
+  onInfo: () => void;
   onOpenSettings: () => void;
 }
 
@@ -16,14 +22,18 @@ export function MainMenu({
   levels,
   selectedLevelId,
   progress,
+  playerName,
+  language,
   onSelectLevel,
   onStart,
   onOpenSettings,
+  onLeaderboard,
+  onInfo,
 }: MainMenuProps) {
   return (
     <section className={styles.menuCard} aria-label="Главное меню">
       <div>
-        <p className={styles.kicker}>План на неделю</p>
+        <p className={styles.kicker}>{playerName ? `Привет, ${playerName}` : 'План на неделю'}</p>
         <h2>Освободи время для настоящей работы</h2>
         <p className={styles.description}>
           Разбивай встречи, удерживай фокус и береги кофе.
@@ -61,15 +71,17 @@ export function MainMenu({
 
       <div className={styles.actions}>
         <button type="button" className={styles.startButton} onClick={onStart}>
-          Начать работу
+          {t(language, 'menu.play')}
         </button>
+        <button type="button" className={styles.settingsButton} onClick={onLeaderboard}>{t(language, 'menu.leaderboard')}</button>
         <button
           type="button"
           className={styles.settingsButton}
           onClick={onOpenSettings}
         >
-          Настройки
+          {t(language, 'menu.settings')}
         </button>
+        <button type="button" className={styles.settingsButton} onClick={onInfo}>{t(language, 'menu.info')}</button>
       </div>
     </section>
   );
