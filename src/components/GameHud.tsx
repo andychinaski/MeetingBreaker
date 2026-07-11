@@ -170,10 +170,10 @@ export function GameHud({
           <span>Уровень</span>
           <strong>{hud.levelTitle}</strong>
         </div>
-        {hud.coffeeEnabled && <div className={styles.statChip}>
+        <div className={styles.statChip}>
           <span>Очки</span>
           <strong>{hud.score.toLocaleString('ru-RU')}</strong>
-        </div>}
+        </div>
         <div className={styles.statChip}>
           <span>Свободно</span>
           <strong>{formatFreedTime(hud.freedMinutes)}</strong>
@@ -184,12 +184,12 @@ export function GameHud({
             ×{hud.combo} · {hud.multiplier.toFixed(2)}
           </strong>
         </div>
-        <div className={styles.statChip}>
+        {hud.coffeeEnabled && <div className={styles.statChip}>
           <span>Кофе</span>
           <strong aria-label={`${hud.coffeeCups} чашки кофе`}>
             {hud.coffeeCups > 0 ? '☕'.repeat(hud.coffeeCups) : '—'}
           </strong>
-        </div>
+        </div>}
         <div className={styles.statChip}>
           <span>Бонус</span>
           <strong>{hud.activeBonus}</strong>

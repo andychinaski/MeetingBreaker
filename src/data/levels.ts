@@ -1,245 +1,52 @@
 import type { LevelConfig } from '../game/types/level';
+import type { MeetingBlockConfig, WorkDay } from '../game/types/meeting';
 
-const BASE_LEVELS: readonly LevelConfig[] = [
-  {
-    id: 'calendar-overload',
-    title: 'Calendar Overload',
-    description: 'Обычная рабочая неделя, в которой не осталось времени работать.',
-    initialBallSpeed: 430,
-    initialCoffeeCups: 3,
-    meetings: [
-      {
-        id: 'mon-daily',
-        typeId: 'daily',
-        title: 'Daily Stand-up',
-        day: 'monday',
-        startMinutes: 540,
-        durationMinutes: 15,
-        attendeeCount: 8,
-        required: true,
-      },
-      {
-        id: 'mon-sync',
-        typeId: 'project-status',
-        title: 'Project Status',
-        day: 'monday',
-        startMinutes: 585,
-        durationMinutes: 30,
-        attendeeCount: 9,
-        required: true,
-      },
-      {
-        id: 'mon-refinement',
-        typeId: 'retrospective',
-        title: 'Retrospective',
-        day: 'monday',
-        startMinutes: 660,
-        durationMinutes: 60,
-        attendeeCount: 11,
-        required: true,
-      },
-      {
-        id: 'mon-one-to-one',
-        typeId: 'one-to-one',
-        title: 'One-to-One',
-        day: 'monday',
-        startMinutes: 840,
-        durationMinutes: 30,
-        attendeeCount: 2,
-        required: true,
-      },
-      {
-        id: 'tue-daily',
-        typeId: 'daily',
-        title: 'Daily Stand-up',
-        day: 'tuesday',
-        startMinutes: 555,
-        durationMinutes: 15,
-        attendeeCount: 8,
-        required: true,
-      },
-      {
-        id: 'tue-planning',
-        typeId: 'corporate-training',
-        title: 'Corporate Training',
-        day: 'tuesday',
-        startMinutes: 600,
-        durationMinutes: 120,
-        attendeeCount: 12,
-        required: true,
-      },
-      {
-        id: 'tue-sync',
-        typeId: 'team-sync',
-        title: 'Developer Sync',
-        day: 'tuesday',
-        startMinutes: 780,
-        durationMinutes: 30,
-        attendeeCount: 7,
-        required: true,
-      },
-      {
-        id: 'tue-architecture',
-        typeId: 'go-no-go',
-        title: 'Go / No-Go',
-        day: 'tuesday',
-        startMinutes: 900,
-        durationMinutes: 60,
-        attendeeCount: 6,
-        required: true,
-      },
-      {
-        id: 'wed-daily',
-        typeId: 'daily',
-        title: 'Daily Stand-up',
-        day: 'wednesday',
-        startMinutes: 540,
-        durationMinutes: 15,
-        attendeeCount: 8,
-        required: true,
-      },
-      {
-        id: 'wed-no-agenda',
-        typeId: 'incident-call',
-        title: 'Incident Call',
-        day: 'wednesday',
-        startMinutes: 600,
-        durationMinutes: 60,
-        attendeeCount: 15,
-        required: true,
-      },
-      {
-        id: 'wed-refinement',
-        typeId: 'recurring-meeting',
-        title: 'Recurring Meeting',
-        day: 'wednesday',
-        startMinutes: 690,
-        durationMinutes: 60,
-        attendeeCount: 10,
-        required: true,
-      },
-      {
-        id: 'wed-all-hands',
-        typeId: 'all-hands',
-        title: 'Quarterly All Hands',
-        day: 'wednesday',
-        startMinutes: 840,
-        durationMinutes: 120,
-        attendeeCount: 120,
-        required: true,
-      },
-      {
-        id: 'thu-daily',
-        typeId: 'daily',
-        title: 'Daily Stand-up',
-        day: 'thursday',
-        startMinutes: 555,
-        durationMinutes: 15,
-        attendeeCount: 8,
-        required: true,
-      },
-      {
-        id: 'thu-one-to-one',
-        typeId: 'preparation-meeting',
-        title: 'Preparation Meeting',
-        day: 'thursday',
-        startMinutes: 600,
-        durationMinutes: 30,
-        attendeeCount: 2,
-        required: true,
-        groupId: 'stakeholder-prep',
-      },
-      {
-        id: 'thu-architecture',
-        typeId: 'stakeholder-meeting',
-        title: 'Stakeholder Meeting',
-        day: 'thursday',
-        startMinutes: 660,
-        durationMinutes: 60,
-        attendeeCount: 7,
-        required: true,
-        linkedMeetingIds: ['thu-one-to-one'],
-      },
-      {
-        id: 'thu-sync',
-        typeId: 'cross-team-sync',
-        title: 'Cross-Team Sync',
-        day: 'thursday',
-        startMinutes: 780,
-        durationMinutes: 30,
-        attendeeCount: 14,
-        required: true,
-        groupId: 'cross-team-a',
-      },
-      {
-        id: 'fri-daily',
-        typeId: 'daily',
-        title: 'Daily Stand-up',
-        day: 'friday',
-        startMinutes: 540,
-        durationMinutes: 15,
-        attendeeCount: 8,
-        required: true,
-      },
-      {
-        id: 'fri-planning',
-        typeId: 'sprint-planning',
-        title: 'Roadmap Planning',
-        day: 'friday',
-        startMinutes: 600,
-        durationMinutes: 90,
-        attendeeCount: 18,
-        required: true,
-      },
-      {
-        id: 'fri-no-agenda',
-        typeId: 'meeting-without-agenda',
-        title: 'Could Have Been an Email',
-        day: 'friday',
-        startMinutes: 720,
-        durationMinutes: 60,
-        attendeeCount: 23,
-        required: true,
-      },
-      {
-        id: 'fri-sync',
-        typeId: 'cross-team-sync',
-        title: 'Weekly Team Status',
-        day: 'friday',
-        startMinutes: 840,
-        durationMinutes: 30,
-        attendeeCount: 10,
-        required: true,
-        groupId: 'cross-team-a',
-      },
-      {
-        id: 'fri-all-hands',
-        typeId: 'all-hands',
-        title: 'Friday Town Hall',
-        day: 'friday',
-        startMinutes: 930,
-        durationMinutes: 120,
-        attendeeCount: 90,
-        required: true,
-      },
-    ],
-  },
+const days: WorkDay[] = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday'];
+
+function meeting(index: number, typeId: string, customHp?: number): MeetingBlockConfig {
+  const day = days[index % days.length]!;
+  const row = Math.floor(index / days.length);
+  return {
+    id: `meeting-${index + 1}`,
+    typeId,
+    title: typeId,
+    day,
+    startMinutes: 555 + row * 105,
+    durationMinutes: row % 2 === 0 ? 30 : 60,
+    attendeeCount: 3 + index,
+    customHp,
+    required: true,
+  };
+}
+
+const levelOneMeetings = Array.from({ length: 10 }, (_, index) =>
+  meeting(index, index % 3 === 0 ? 'team-sync' : 'daily', 1),
+);
+const levelTwoTypes = ['daily', 'team-sync', 'one-to-one', 'refinement'] as const;
+const levelTwoMeetings = Array.from({ length: 14 }, (_, index) =>
+  meeting(index, levelTwoTypes[index % levelTwoTypes.length]!, index % 4 === 3 ? 2 : 1),
+);
+const advancedTypes = ['daily', 'team-sync', 'one-to-one', 'refinement', 'sprint-planning', 'architecture-review', 'meeting-without-agenda', 'all-hands'] as const;
+const advancedMeetings = Array.from({ length: 18 }, (_, index) =>
+  meeting(index, advancedTypes[index % advancedTypes.length]!),
+);
+
+export const LEVELS: readonly LevelConfig[] = [
+  { id: 'calendar-overload', title: 'Неделя 1 · Первый созвон', description: 'Простая рабочая неделя: только статические встречи с 1 HP.', initialBallSpeed: 360, initialCoffeeCups: 3, meetings: levelOneMeetings },
+  { id: 'month-week-2', title: 'Неделя 2 · Плотный график', description: 'Статические встречи с 1–2 HP и стандартными бонусами.', initialBallSpeed: 390, initialCoffeeCups: 3, meetings: levelTwoMeetings.map((item) => ({ ...item, id: `w2-${item.id}` })) },
+  ...[3, 4, 5].map((week): LevelConfig => ({ id: `month-week-${week}`, title: week === 5 ? 'Финальная неделя · All Hands' : `Неделя ${week} · Calendar Overload`, description: 'Более плотная раскладка и разные MVP-типы встреч.', initialBallSpeed: 410 + (week - 3) * 25, initialCoffeeCups: 3, meetings: advancedMeetings.map((item) => ({ ...item, id: `w${week}-${item.id}` })) })),
 ];
 
-const BASE_LEVEL = BASE_LEVELS[0];
-if (!BASE_LEVEL) throw new Error('At least one level must be configured');
-const WEEK_TITLES = ['Неделя 1 · Calendar Overload', 'Неделя 2 · Синхронизация', 'Неделя 3 · Эскалация', 'Неделя 4 · Решения', 'Финальная неделя · All Hands'] as const;
-export const LEVELS: readonly LevelConfig[] = WEEK_TITLES.map((title, index) => ({
-  ...BASE_LEVEL,
-  id: index === 0 ? BASE_LEVEL.id : `month-week-${index + 1}`,
-  title,
-  description: index === 4 ? 'Финальная неделя месяца с All Hands Boss.' : `Рабочая неделя ${index + 1} из 5.`,
-  initialBallSpeed: BASE_LEVEL.initialBallSpeed + index * 18,
-  meetings: BASE_LEVEL.meetings.map((meeting) => ({ ...meeting, id: index === 0 ? meeting.id : `w${index + 1}-${meeting.id}` })),
-}));
+export const TUTORIAL_LEVEL: LevelConfig = {
+  id: 'tutorial-week',
+  title: 'Учебная рабочая неделя',
+  description: 'Пошаговое знакомство с управлением и базовыми механиками.',
+  initialBallSpeed: 330,
+  initialCoffeeCups: 3,
+  meetings: [
+    { ...meeting(0, 'daily', 1), id: 'tutorial-basic', title: 'Обычная встреча' },
+    { ...meeting(6, 'refinement', 2), id: 'tutorial-durable', title: 'Встреча с 2 HP' },
+  ],
+};
 
-export const DEFAULT_LEVEL = LEVELS[0];
-
-if (!DEFAULT_LEVEL) {
-  throw new Error('At least one level must be configured');
-}
+export const DEFAULT_LEVEL = LEVELS[0]!;

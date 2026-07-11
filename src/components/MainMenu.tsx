@@ -36,7 +36,7 @@ export function MainMenu({
         <p className={styles.kicker}>{playerName ? `Привет, ${playerName}` : 'План на неделю'}</p>
         <h2>Освободи время для настоящей работы</h2>
         <p className={styles.description}>
-          Разбивай встречи, удерживай фокус и береги кофе.
+          Разбей все встречи и сохрани кофе до пятницы.
         </p>
       </div>
 
@@ -69,7 +69,7 @@ export function MainMenu({
         </div>
       </dl>
 
-      <div className={styles.actions}>
+      <div className={styles.menuActions}>
         <button type="button" className={styles.startButton} onClick={onStart}>
           {t(language, 'menu.play')}
         </button>

@@ -7,6 +7,10 @@
   --color-text: #f8fafc;
   --color-text-muted: #94a3b8;
   --color-accent: #5eead4;
+  --color-accent-button-bg: #5eead4;
+  --color-accent-hover: #7ff3df;
+  --color-accent-active: #2dd4bf;
+  --color-accent-button-text: #083344;
   --shadow-card: 0 24px 80px rgb(0 0 0 / 35%);
   color: var(--color-text);
   background: var(--color-background);
@@ -26,5 +30,9 @@
   --color-text: #0f172a;
   --color-text-muted: #64748b;
   --color-accent: #0f9f91;
+  --color-accent-button-bg: #08776e;
+  --color-accent-hover: #06675f;
+  --color-accent-active: #05564f;
+  --color-accent-button-text: #ffffff;
   --shadow-card: 0 24px 70px rgb(15 23 42 / 14%);
 }

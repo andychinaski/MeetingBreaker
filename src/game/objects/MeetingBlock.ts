@@ -63,9 +63,9 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
     this.durability = new MeetingDurability(
       config.customHp ?? meetingType.maxHp,
     );
-    this.behaviors = createMeetingBehaviors(
-      meetingType.behaviorIds,
-    );
+    // HOTFIX 2: post-MVP behaviors are intentionally disabled until their
+    // mechanics can be introduced progressively and explained to the player.
+    this.behaviors = createMeetingBehaviors([]);
     this.behaviorContext = {
       scene,
       block: this,

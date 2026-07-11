@@ -4,7 +4,7 @@ import type { GameModeConfig } from '../types/mode';
 export interface CalendarSlot { day: WorkDay; startMinutes: number; durationMinutes: number }
 export interface EndlessWave { wave: number; warningSeconds: number; meetings: MeetingBlockConfig[] }
 
-const TYPES = ['daily', 'team-sync', 'project-status', 'sprint-review', 'incident-call', 'recurring-meeting'] as const;
+const TYPES = ['daily', 'team-sync', 'one-to-one', 'refinement', 'sprint-planning', 'architecture-review', 'meeting-without-agenda', 'all-hands'] as const;
 
 export class EndlessMeetingGenerator {
   private wave = 0;

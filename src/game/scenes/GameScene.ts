@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { DEFAULT_LEVEL, LEVELS } from '../../data/levels';
+import { DEFAULT_LEVEL, LEVELS, TUTORIAL_LEVEL } from '../../data/levels';
 import { getMeetingType } from '../../data/meetingTypes';
 import { GAME_HEIGHT, GAME_WIDTH } from '../config/gameConfig';
 import {
@@ -103,6 +103,7 @@ export class GameScene extends Phaser.Scene {
   private createdMeetingCount = 0;
   private tutorialController?: TutorialController;
   private tutorialText?: Phaser.GameObjects.Text;
+  private sessionMeetings: MeetingBlockConfig[] = [];
 
   constructor() {
     super('GameScene');
@@ -182,13 +183,17 @@ export class GameScene extends Phaser.Scene {
   private initializeGameState(): void {
     const modeId = this.game.registry.get(MODE_REGISTRY_KEY) as GameModeConfig['id'] | undefined;
     this.mode = GAME_MODES[modeId ?? 'campaign'];
-    this.tutorialController = this.game.registry.get(TUTORIAL_REGISTRY_KEY) ? new TutorialController() : undefined;
+    const tutorialEnabled = Boolean(this.game.registry.get(TUTORIAL_REGISTRY_KEY));
+    this.tutorialController = tutorialEnabled ? new TutorialController() : undefined;
     const levelId = this.game.registry.get(LEVEL_REGISTRY_KEY) as string | undefined;
-    this.level = LEVELS.find((level) => level.id === levelId) ?? DEFAULT_LEVEL;
+    this.level = tutorialEnabled ? TUTORIAL_LEVEL : LEVELS.find((level) => level.id === levelId) ?? DEFAULT_LEVEL;
+    this.endlessGenerator = this.mode.endless ? new EndlessMeetingGenerator(this.mode) : undefined;
+    const generatedMeetings = this.endlessGenerator?.createWave([]).meetings.map((config) => ({ ...config, title: getMeetingType(config.typeId).title }));
+    this.sessionMeetings = generatedMeetings ?? this.level.meetings.map((meeting) => ({ ...meeting }));
     this.scoreSystem = new ScoreSystem(this.mode.scoreMultiplier);
     this.coffeeSystem = new CoffeeSystem(this.mode.coffeeEnabled ? (this.mode.initialCoffeeCups ?? this.level.initialCoffeeCups) : 1);
     this.levelProgress = new LevelProgress(
-      this.level.meetings
+      this.sessionMeetings
         .filter((meeting) => meeting.required ?? true)
         .map((meeting) => meeting.id),
     );
@@ -198,7 +203,6 @@ export class GameScene extends Phaser.Scene {
       DEFAULT_SETTINGS,
     );
     this.powerUps.length = 0;
-    this.endlessGenerator = this.mode.endless ? new EndlessMeetingGenerator(this.mode) : undefined;
     this.createdMeetingCount = 0;
     this.gameStatus = 'playing';
     if (this.tutorialController) {
@@ -211,7 +215,7 @@ export class GameScene extends Phaser.Scene {
     this.meetingBlocks.length = 0;
     new CalendarGrid(this, DEFAULT_CALENDAR_LAYOUT);
 
-    for (const meetingConfig of this.level.meetings) {
+    for (const meetingConfig of this.sessionMeetings) {
       const meetingType = getMeetingType(meetingConfig.typeId);
       const rectangle = calculateMeetingRect(
         meetingConfig,
@@ -225,6 +229,10 @@ export class GameScene extends Phaser.Scene {
 
     this.game.canvas.dataset.calendarReady = 'true';
     this.game.canvas.dataset.meetingCount = this.meetingBlocks.length.toString();
+    this.game.canvas.dataset.meetingLayout = this.sessionMeetings.map((meeting) => `${meeting.day}:${meeting.startMinutes}:${meeting.typeId}`).join('|');
+    this.game.canvas.dataset.gameMode = this.mode.id;
+    this.game.canvas.dataset.ballAcceleration = String(this.mode.ballAccelerationEnabled);
+    this.game.canvas.dataset.coffeeEnabled = String(this.mode.coffeeEnabled);
   }
 
   private configureInput(): void {
@@ -574,7 +582,7 @@ export class GameScene extends Phaser.Scene {
     this.game.canvas.dataset.requiredMeetings =
       this.levelProgress.remainingRequired.toString();
 
-    if (completedNow && !this.mode.endless) {
+    if (completedNow && !this.mode.endless && !this.tutorialController) {
       this.finishWithVictory();
     } else if (completedNow) {
       this.scheduleEndlessWave();
@@ -594,6 +602,10 @@ export class GameScene extends Phaser.Scene {
       const payload: PauseChangedPayload = { paused: true };
       this.game.events.emit(GAME_EVENTS.PAUSE_CHANGED, payload);
       this.advanceTutorial('paused');
+      if (this.tutorialController?.current?.waitForEvent === 'level-completed') {
+        this.finishWithVictory();
+        return;
+      }
       this.scene.pause();
       return;
     }
@@ -785,6 +797,7 @@ export class GameScene extends Phaser.Scene {
       activePowerUps: this.powerUpSystem
         .getActiveTypes(this.time.now)
         .map((type) => POWER_UP_DEFINITIONS[type].title),
+      coffeeEnabled: this.mode.coffeeEnabled,
       status: this.gameStatus,
     };
     this.game.registry.set(GAME_STATE_REGISTRY_KEY, state);
@@ -856,6 +869,10 @@ export class GameScene extends Phaser.Scene {
     delete this.game.canvas.dataset.activeBalls;
     delete this.game.canvas.dataset.calendarReady;
     delete this.game.canvas.dataset.meetingCount;
+    delete this.game.canvas.dataset.meetingLayout;
+    delete this.game.canvas.dataset.gameMode;
+    delete this.game.canvas.dataset.ballAcceleration;
+    delete this.game.canvas.dataset.coffeeEnabled;
     delete this.game.canvas.dataset.paddleX;
     delete this.game.canvas.dataset.paused;
     delete this.game.canvas.dataset.coffeeCups;

@@ -12,6 +12,22 @@ import {
 } from './ballPhysics';
 
 describe('calculatePaddleBounce', () => {
+  it('maps five hit positions to progressively wider reflection angles', () => {
+    const positions = [0, 50, 100, 150, 200];
+    const velocities = positions.map((x) =>
+      calculatePaddleBounce(x, 100, 200, 500, 1),
+    );
+
+    expect(velocities.map(({ x }) => Math.sign(x))).toEqual([-1, -1, 1, 1, 1]);
+    expect(Math.abs(velocities[0]!.x)).toBeGreaterThan(Math.abs(velocities[1]!.x));
+    expect(Math.abs(velocities[1]!.x)).toBeGreaterThan(Math.abs(velocities[2]!.x));
+    expect(Math.abs(velocities[4]!.x)).toBeGreaterThan(Math.abs(velocities[3]!.x));
+    velocities.forEach((velocity) => {
+      expect(Math.abs(velocity.y)).toBeGreaterThanOrEqual(MIN_VERTICAL_SPEED - 0.001);
+      expect(Math.hypot(velocity.x, velocity.y)).toBeCloseTo(500);
+    });
+  });
+
   it('sends the ball left after a hit on the left side', () => {
     const velocity = calculatePaddleBounce(10, 100, 200, 500);
 

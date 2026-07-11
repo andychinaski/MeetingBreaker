@@ -32,6 +32,16 @@ test('first run validates the player and opens mode selection', async ({ page })
   await expect(page.locator('canvas')).toHaveCount(0);
 });
 
+test('tutorial can be launched again from information', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('meeting-breaker-profile', JSON.stringify({ version: 2, preferences: { playerName: 'Тестер', controlScheme: 'keyboard', tutorialCompleted: true }, settings: {}, progress: { unlockedLevelIds: ['calendar-overload'] }, leaderboard: [] })));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Информация' }).click();
+  await page.getByRole('button', { name: 'Запустить обучение' }).click();
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-tutorial-step', 'move');
+  await expect(canvas).toHaveAttribute('data-meeting-count', '2');
+});
+
 test('opens the calendar level and launches the ball', async ({ page }) => {
   const browserErrors: string[] = [];
   page.on('pageerror', (error) => browserErrors.push(error.message));
@@ -49,7 +59,7 @@ test('opens the calendar level and launches the ball', async ({ page }) => {
   await expect(canvas).toBeVisible();
   await expect(canvas).toHaveAttribute('data-scene', 'GameScene');
   await expect(canvas).toHaveAttribute('data-calendar-ready', 'true');
-  await expect(canvas).toHaveAttribute('data-meeting-count', '21');
+  await expect(canvas).toHaveAttribute('data-meeting-count', '10');
   await expect(canvas).toHaveAttribute('data-coffee-cups', '3');
   await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
   await expect(page.getByLabel('Игровая статистика')).toBeVisible();
@@ -219,6 +229,13 @@ test('menu delays Phaser creation and persists settings', async ({ page }) => {
   await expect(page.getByLabel('Главное меню')).toBeVisible();
   await expect(page.locator('canvas')).toHaveCount(0);
   await expect(page.getByText('Лучший результат')).toBeVisible();
+  await expect(page.getByText('Пять дней, один мяч и слишком много встреч.')).toBeVisible();
+  await expect(page.getByText('Разбей все встречи и сохрани кофе до пятницы.')).toBeVisible();
+  const menuButtons = page.getByLabel('Главное меню').locator('button');
+  const boxes = await menuButtons.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect()).map(({ x, y, width }) => ({ x, y, width })));
+  expect(boxes.map((box) => Math.round(box.x))).toEqual(boxes.map(() => Math.round(boxes[0]!.x)));
+  expect(boxes[1]!.y).toBeGreaterThan(boxes[0]!.y);
+  expect(boxes.every((box) => Math.round(box.width) === Math.round(boxes[0]!.width))).toBe(true);
 
   await page.getByRole('button', { name: 'Настройки' }).click();
   const settingsDialog = page.getByRole('dialog');
@@ -248,6 +265,34 @@ test('menu delays Phaser creation and persists settings', async ({ page }) => {
   await page.getByRole('button', { name: 'Играть' }).click();
   await page.getByRole('button', { name: /Прохождение/ }).click();
   await expect(page.locator('canvas')).toHaveCount(1);
+});
+
+test('endless modes start from random MVP layouts and keep distinct rules', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('meeting-breaker-profile', JSON.stringify({ version: 2, preferences: { playerName: 'Тестер', controlScheme: 'keyboard', tutorialCompleted: true }, settings: {}, progress: { unlockedLevelIds: ['calendar-overload'] }, leaderboard: [] })));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Играть' }).click();
+  await page.getByRole('button', { name: /Relax Mode/ }).click();
+  let canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-game-mode', 'relax');
+  await expect(canvas).toHaveAttribute('data-ball-acceleration', 'false');
+  await expect(canvas).toHaveAttribute('data-coffee-enabled', 'true');
+  const firstLayout = await canvas.getAttribute('data-meeting-layout');
+  await page.getByRole('button', { name: 'Пауза' }).click();
+  await page.getByRole('button', { name: 'Закончить рабочую неделю' }).click();
+  await page.getByRole('button', { name: 'Играть' }).click();
+  await page.getByRole('button', { name: /Relax Mode/ }).click();
+  canvas = page.locator('canvas');
+  const secondLayout = await canvas.getAttribute('data-meeting-layout');
+  expect(secondLayout).not.toBe(firstLayout);
+  await page.getByRole('button', { name: 'Пауза' }).click();
+  await page.getByRole('button', { name: 'Закончить рабочую неделю' }).click();
+  await page.getByRole('button', { name: 'Играть' }).click();
+  await page.getByRole('button', { name: /Hard Mode/ }).click();
+  canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-game-mode', 'hard');
+  await expect(canvas).toHaveAttribute('data-ball-acceleration', 'true');
+  await expect(canvas).toHaveAttribute('data-coffee-enabled', 'false');
+  await expect(page.getByText('Кофе', { exact: true })).toHaveCount(0);
 });
 
 test('game fits target desktop sizes and browser zoom equivalents', async ({

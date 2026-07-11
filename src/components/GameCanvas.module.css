@@ -40,11 +40,14 @@
   padding: 12px 22px;
   border: 0;
   border-radius: 10px;
-  color: #082f49;
-  background: var(--color-accent);
+  color: var(--color-accent-button-text);
+  background: var(--color-accent-button-bg);
   font-weight: 900;
   cursor: pointer;
 }
+.exitMenu button:hover { background: var(--color-accent-hover); }
+.exitMenu button:active { background: var(--color-accent-active); }
+.exitMenu button:focus-visible { outline: 3px solid color-mix(in srgb, var(--color-accent) 45%, transparent); outline-offset: 2px; }
 
 .canvasContainer {
   width: 100%;

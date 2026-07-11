@@ -18,6 +18,7 @@ export interface GameState extends ScoreSnapshot {
   coffeeCups: number;
   initialCoffeeCups: number;
   activePowerUps: string[];
+  coffeeEnabled: boolean;
   status: GameStatus;
 }
 

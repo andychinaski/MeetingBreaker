@@ -7,8 +7,9 @@ describe('meeting configuration', () => {
     expect(MEETING_TYPE_LIST.length).toBeGreaterThanOrEqual(21);
   });
 
-  it('defines at least twenty meetings for the MVP level', () => {
-    expect(DEFAULT_LEVEL.meetings.length).toBeGreaterThanOrEqual(20);
+  it('keeps the first level deliberately small for early progression', () => {
+    expect(DEFAULT_LEVEL.meetings).toHaveLength(10);
+    expect(DEFAULT_LEVEL.meetings.every((meeting) => meeting.customHp === 1)).toBe(true);
   });
 
   it('uses only configured meeting types', () => {

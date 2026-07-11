@@ -200,7 +200,7 @@
 
 .primaryButton {
   border: 0;
-  color: #082f49;
+  color: var(--color-accent-button-text);
   background: #5eead4;
 }
 
