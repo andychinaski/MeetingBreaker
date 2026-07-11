@@ -1,0 +1,25 @@
+@import './variables.css';
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  min-width: 320px;
+  background: var(--color-background);
+}
+
+body {
+  min-width: 320px;
+  min-height: 100vh;
+  margin: 0;
+  background:
+    radial-gradient(circle at 80% 10%, rgb(94 234 212 / 8%), transparent 30%),
+    radial-gradient(circle at 10% 70%, rgb(96 165 250 / 8%), transparent 35%),
+    var(--color-background);
+}
+
+button,
+input {
+  font: inherit;
+}
