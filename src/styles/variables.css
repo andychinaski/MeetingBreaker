@@ -16,3 +16,15 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
 }
+
+:root[data-theme='light'] {
+  --color-background: #eef2f7;
+  --color-surface: #ffffff;
+  --color-canvas: #101827;
+  --color-grid: rgb(148 163 184 / 8%);
+  --color-border: rgb(15 23 42 / 16%);
+  --color-text: #0f172a;
+  --color-text-muted: #64748b;
+  --color-accent: #0f9f91;
+  --shadow-card: 0 24px 70px rgb(15 23 42 / 14%);
+}

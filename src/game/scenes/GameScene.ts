@@ -6,7 +6,6 @@ import {
   BALL_RADIUS,
   BALL_RESET_DELAY_MS,
   PADDLE_SPEED,
-  PADDLE_WIDTH,
   PADDLE_Y,
   WORLD_PADDING,
 } from '../config/gameplay';
@@ -14,6 +13,7 @@ import { Ball } from '../objects/Ball';
 import { CalendarGrid } from '../objects/CalendarGrid';
 import { MeetingBlock } from '../objects/MeetingBlock';
 import { Paddle } from '../objects/Paddle';
+import { PowerUp } from '../objects/PowerUp';
 import {
   GAME_COMMANDS,
   GAME_EVENTS,
@@ -42,7 +42,22 @@ import {
 import { CoffeeSystem } from '../systems/CoffeeSystem';
 import { LevelProgress } from '../systems/LevelProgress';
 import { ScoreSystem } from '../systems/ScoreSystem';
+import {
+  ESPRESSO_DURATION_MS,
+  PowerUpSystem,
+} from '../systems/PowerUpSystem';
 import type { GameState, GameStatus } from '../types/game';
+import {
+  POWER_UP_DEFINITIONS,
+  POWER_UP_TYPES,
+  type PowerUpType,
+} from '../types/powerUp';
+import { SoundSystem } from '../../services/SoundSystem';
+import {
+  DEFAULT_SETTINGS,
+  SETTINGS_REGISTRY_KEY,
+  type UserSettings,
+} from '../../services/storageService';
 
 const COFFEE_LOSS_MESSAGES: string[] = [
   'Задача потеряна. Пора за кофе.',
@@ -56,6 +71,8 @@ const COFFEE_LOSS_MESSAGES: string[] = [
 export class GameScene extends Phaser.Scene {
   private paddle!: Paddle;
   private ball!: Ball;
+  private readonly activeBalls: Ball[] = [];
+  private readonly powerUps: PowerUp[] = [];
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private leftKey!: Phaser.Input.Keyboard.Key;
   private rightKey!: Phaser.Input.Keyboard.Key;
@@ -69,6 +86,9 @@ export class GameScene extends Phaser.Scene {
   private scoreSystem!: ScoreSystem;
   private coffeeSystem!: CoffeeSystem;
   private levelProgress!: LevelProgress;
+  private powerUpSystem!: PowerUpSystem;
+  private espressoTimer?: Phaser.Time.TimerEvent;
+  private soundSystem!: SoundSystem;
   private gameStatus: GameStatus = 'idle';
 
   constructor() {
@@ -97,6 +117,13 @@ export class GameScene extends Phaser.Scene {
 
     this.updateKeyboardMovement(delta);
 
+    for (const powerUp of [...this.powerUps]) {
+      powerUp.syncLabel();
+      if (powerUp.y > GAME_HEIGHT + 30) {
+        this.removePowerUp(powerUp);
+      }
+    }
+
     if (!this.ballLaunched) {
       if (!this.resettingBall) {
         this.ball.attachToPaddle(this.paddle);
@@ -104,15 +131,18 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.ball.setSafeVelocity(
-      accelerateVelocity(this.ball.getVelocity(), delta / 1000),
-      this.launchDirection,
-    );
-    this.ball.syncLabel();
+    for (const ball of [...this.activeBalls]) {
+      ball.setSafeVelocity(
+        accelerateVelocity(ball.getVelocity(), delta / 1000),
+        this.launchDirection,
+      );
+      ball.syncLabel();
 
-    if (this.ball.y - BALL_RADIUS > GAME_HEIGHT) {
-      this.handleBallLost();
+      if (ball.y - BALL_RADIUS > GAME_HEIGHT) {
+        this.handleSingleBallLost(ball);
+      }
     }
+
   }
 
   private configureWorld(): void {
@@ -130,6 +160,8 @@ export class GameScene extends Phaser.Scene {
     this.paddle = new Paddle(this, GAME_WIDTH / 2, PADDLE_Y);
     this.ball = new Ball(this, GAME_WIDTH / 2, PADDLE_Y - 48);
     this.ball.resetOnPaddle(this.paddle);
+    this.activeBalls.length = 0;
+    this.activeBalls.push(this.ball);
   }
 
   private initializeGameState(): void {
@@ -140,6 +172,12 @@ export class GameScene extends Phaser.Scene {
         .filter((meeting) => meeting.required ?? true)
         .map((meeting) => meeting.id),
     );
+    this.powerUpSystem = new PowerUpSystem();
+    this.soundSystem = new SoundSystem(() =>
+      (this.game.registry.get(SETTINGS_REGISTRY_KEY) as UserSettings | undefined) ??
+      DEFAULT_SETTINGS,
+    );
+    this.powerUps.length = 0;
     this.gameStatus = 'playing';
   }
 
@@ -186,13 +224,24 @@ export class GameScene extends Phaser.Scene {
   }
 
   private configureCollisions(): void {
-    this.physics.add.collider(this.ball, this.paddle, () => {
-      this.handlePaddleCollision();
+    this.configureBallCollisions(this.ball);
+  }
+
+  private configureBallCollisions(ball: Ball): void {
+    this.physics.add.collider(ball, this.paddle, () => {
+      this.handlePaddleCollision(ball);
     });
 
     for (const meetingBlock of this.meetingBlocks) {
-      this.physics.add.collider(this.ball, meetingBlock.collisionZone, () => {
-        meetingBlock.takeDamage();
+      this.physics.add.collider(ball, meetingBlock.collisionZone, () => {
+        const declineUsed = this.powerUpSystem.consumeDecline();
+        const damage = meetingBlock.takeDamage(
+          declineUsed ? meetingBlock.currentHp : 1,
+        );
+        this.soundSystem.play(damage.destroyedNow ? 'destroy' : 'meeting');
+        if (declineUsed) {
+          this.publishActivePowerUps();
+        }
       });
     }
   }
@@ -258,7 +307,7 @@ export class GameScene extends Phaser.Scene {
   };
 
   private movePaddleTo(x: number): void {
-    const halfWidth = PADDLE_WIDTH / 2;
+    const halfWidth = this.paddle.displayWidth / 2;
     this.paddle.moveTo(
       x,
       WORLD_PADDING + halfWidth,
@@ -282,19 +331,21 @@ export class GameScene extends Phaser.Scene {
     );
 
     this.ball.launch({ x: horizontalSpeed, y: verticalSpeed });
+    this.activeBalls.length = 0;
+    this.activeBalls.push(this.ball);
     this.ballLaunched = true;
     this.setCanvasState('launched');
   }
 
-  private handlePaddleCollision(): void {
-    const currentVelocity = this.ball.getVelocity();
+  private handlePaddleCollision(ball: Ball): void {
+    const currentVelocity = ball.getVelocity();
 
     if (currentVelocity.y <= 0) {
       return;
     }
 
     const impactOffset = Phaser.Math.Clamp(
-      (this.ball.x - this.paddle.x) / (PADDLE_WIDTH / 2),
+      (ball.x - this.paddle.x) / (this.paddle.displayWidth / 2),
       -1,
       1,
     );
@@ -305,9 +356,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     let nextVelocity = calculatePaddleBounce(
-      this.ball.x,
+      ball.x,
       this.paddle.x,
-      PADDLE_WIDTH,
+      this.paddle.displayWidth,
       Math.hypot(currentVelocity.x, currentVelocity.y),
       this.launchDirection,
     );
@@ -321,21 +372,42 @@ export class GameScene extends Phaser.Scene {
       this.recentPaddleImpacts.length = 0;
     }
 
-    this.ball.setSafeVelocity(nextVelocity, this.launchDirection);
+    ball.setSafeVelocity(nextVelocity, this.launchDirection);
+    this.soundSystem.play('paddle');
 
     if (this.scoreSystem.snapshot.combo > 0) {
       this.publishScore(this.scoreSystem.resetCombo());
     }
   }
 
-  private handleBallLost(): void {
+  private handleSingleBallLost(ball: Ball): void {
+    const index = this.activeBalls.indexOf(ball);
+    if (index >= 0) {
+      this.activeBalls.splice(index, 1);
+    }
+    this.game.canvas.dataset.activeBalls = this.activeBalls.length.toString();
+
+    if (ball === this.ball) {
+      ball.hideForReset();
+    } else {
+      ball.destroy();
+    }
+
+    if (this.activeBalls.length > 0) {
+      this.publishActivePowerUps();
+      return;
+    }
+
+    this.handleAllBallsLost();
+  }
+
+  private handleAllBallsLost(): void {
     if (this.gameStatus !== 'playing' || this.resettingBall) {
       return;
     }
 
     this.ballLaunched = false;
     this.resettingBall = true;
-    this.ball.hideForReset();
     this.recentPaddleImpacts.length = 0;
     this.launchDirection = this.launchDirection === 1 ? -1 : 1;
     this.setCanvasState('resetting');
@@ -345,6 +417,8 @@ export class GameScene extends Phaser.Scene {
     }
 
     const coffeeResult = this.coffeeSystem.consume();
+    this.soundSystem.play('lost');
+    this.soundSystem.play('coffee');
     const coffeePayload: CoffeeChangedPayload = {
       coffeeCups: coffeeResult.coffeeCups,
       initialCoffeeCups: this.coffeeSystem.initialCoffeeCups,
@@ -368,6 +442,9 @@ export class GameScene extends Phaser.Scene {
         return;
       }
       this.ball.resetOnPaddle(this.paddle);
+      this.activeBalls.length = 0;
+      this.activeBalls.push(this.ball);
+      this.game.canvas.dataset.activeBalls = '1';
       this.resettingBall = false;
       this.setCanvasState('ready');
     });
@@ -381,6 +458,9 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.publishScore(this.scoreSystem.registerMeetingDestroyed(payload));
+    if (Math.random() < payload.dropChance) {
+      this.spawnPowerUp(payload.x, payload.y);
+    }
     const completedNow = this.levelProgress.registerDestroyed(
       payload.meetingId,
       payload.required,
@@ -419,8 +499,103 @@ export class GameScene extends Phaser.Scene {
     }
   };
 
+  private spawnPowerUp(x: number, y: number): void {
+    const type = Phaser.Utils.Array.GetRandom([...POWER_UP_TYPES]);
+    const powerUp = new PowerUp(this, x, y, type);
+    this.powerUps.push(powerUp);
+    this.physics.add.overlap(powerUp, this.paddle, () => {
+      this.activatePowerUp(powerUp);
+    });
+  }
+
+  private activatePowerUp(powerUp: PowerUp): void {
+    if (!powerUp.active) {
+      return;
+    }
+
+    const type = powerUp.powerUpType;
+    const activation = this.powerUpSystem.activate(type, this.time.now);
+    this.removePowerUp(powerUp);
+    this.soundSystem.play('bonus');
+
+    if (activation.asyncBallRequested) {
+      this.addAsyncBall();
+    } else if (type === 'espresso-shot') {
+      this.activateEspresso(activation.espressoRefreshed);
+    }
+
+    this.publishActivePowerUps(type);
+  }
+
+  private addAsyncBall(): void {
+    const source = this.activeBalls[0];
+    if (!source) {
+      return;
+    }
+
+    const velocity = source.getVelocity();
+    const extraBall = new Ball(this, source.x, source.y);
+    extraBall.launch({
+      x: velocity.x === 0 ? -INITIAL_BALL_SPEED * 0.34 : -velocity.x,
+      y: velocity.y === 0 ? -INITIAL_BALL_SPEED * 0.9 : velocity.y,
+    });
+    this.activeBalls.push(extraBall);
+    this.configureBallCollisions(extraBall);
+    this.game.canvas.dataset.activeBalls = this.activeBalls.length.toString();
+  }
+
+  private activateEspresso(refreshed: boolean): void {
+    if (!refreshed) {
+      this.paddle.setEspressoActive(true);
+      for (const ball of this.activeBalls) {
+        const velocity = ball.getVelocity();
+        ball.setSafeVelocity({ x: velocity.x * 0.72, y: velocity.y * 0.72 });
+      }
+    }
+
+    this.espressoTimer?.remove(false);
+    this.espressoTimer = this.time.delayedCall(ESPRESSO_DURATION_MS, () => {
+      if (!this.powerUpSystem.expireEspresso(this.time.now)) {
+        return;
+      }
+
+      this.paddle.setEspressoActive(false);
+      for (const ball of this.activeBalls) {
+        const velocity = ball.getVelocity();
+        ball.setSafeVelocity({ x: velocity.x / 0.72, y: velocity.y / 0.72 });
+      }
+      this.publishActivePowerUps();
+    });
+  }
+
+  private removePowerUp(powerUp: PowerUp): void {
+    const index = this.powerUps.indexOf(powerUp);
+    if (index >= 0) {
+      this.powerUps.splice(index, 1);
+    }
+    powerUp.destroy();
+  }
+
+  private publishActivePowerUps(activatedType?: PowerUpType): void {
+    const activeTypes = this.powerUpSystem.getActiveTypes(this.time.now);
+    const activeTitles = activeTypes.map(
+      (type) => POWER_UP_DEFINITIONS[type].title,
+    );
+    if (this.activeBalls.length > 1) {
+      activeTitles.unshift('Async Mode');
+    }
+    const type = activatedType ?? activeTypes[0];
+    this.updateRegistryState();
+    this.game.events.emit(GAME_EVENTS.POWER_UP_ACTIVATED, {
+      powerUpId: type ?? 'none',
+      title: type ? POWER_UP_DEFINITIONS[type].title : 'Нет',
+      activePowerUps: activeTitles,
+    });
+  }
+
   private finishWithVictory(): void {
     this.gameStatus = 'won';
+    this.soundSystem.play('victory');
     this.stopGameplay('level-completed');
     const payload: LevelCompletedPayload = {
       result: this.scoreSystem.createLevelResult(
@@ -433,6 +608,7 @@ export class GameScene extends Phaser.Scene {
 
   private finishWithDefeat(): void {
     this.gameStatus = 'lost';
+    this.soundSystem.play('defeat');
     this.stopGameplay('game-over');
     const payload: GameOverPayload = {
       result: this.scoreSystem.createLevelResult(
@@ -446,7 +622,9 @@ export class GameScene extends Phaser.Scene {
   private stopGameplay(state: 'level-completed' | 'game-over'): void {
     this.ballLaunched = false;
     this.resettingBall = false;
-    this.ball.hideForReset();
+    for (const ball of this.activeBalls) {
+      ball.hideForReset();
+    }
     this.physics.pause();
     this.setCanvasState(state);
     this.game.canvas.dataset.gameOutcome = this.gameStatus;
@@ -474,13 +652,16 @@ export class GameScene extends Phaser.Scene {
       ...this.scoreSystem.snapshot,
       coffeeCups: this.coffeeSystem.coffeeCups,
       initialCoffeeCups: this.coffeeSystem.initialCoffeeCups,
-      activePowerUps: [],
+      activePowerUps: this.powerUpSystem
+        .getActiveTypes(this.time.now)
+        .map((type) => POWER_UP_DEFINITIONS[type].title),
       status: this.gameStatus,
     };
     this.game.registry.set(GAME_STATE_REGISTRY_KEY, state);
     this.game.canvas.dataset.score = state.score.toString();
     this.game.canvas.dataset.freedMinutes = state.freedMinutes.toString();
     this.game.canvas.dataset.combo = state.combo.toString();
+    this.game.canvas.dataset.activeBalls = this.activeBalls.length.toString();
   }
 
   private drawBounds(): void {
@@ -513,6 +694,8 @@ export class GameScene extends Phaser.Scene {
   }
 
   private cleanupScene(): void {
+    this.espressoTimer?.remove(false);
+    this.soundSystem.destroy();
     this.game.canvas.removeEventListener(
       'pointermove',
       this.handleCanvasPointerMove,
@@ -538,6 +721,7 @@ export class GameScene extends Phaser.Scene {
       this,
     );
     delete this.game.canvas.dataset.ballState;
+    delete this.game.canvas.dataset.activeBalls;
     delete this.game.canvas.dataset.calendarReady;
     delete this.game.canvas.dataset.meetingCount;
     delete this.game.canvas.dataset.paddleX;

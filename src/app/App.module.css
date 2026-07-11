@@ -8,6 +8,36 @@
   gap: 28px;
 }
 
+.menuShell {
+  width: min(1180px, calc(100% - 48px));
+}
+
+.gameShell {
+  width: min(1180px, calc(100% - 24px), calc((100vh - 150px) * 1.7778));
+  padding: 12px 0;
+  gap: 12px;
+}
+
+.gameShell .header {
+  grid-template-columns: auto 1fr;
+  align-items: end;
+  gap: 6px 18px;
+}
+
+.gameShell .eyebrow {
+  display: none;
+}
+
+.gameShell .header h1 {
+  font-size: clamp(2rem, 3vw, 3rem);
+  line-height: 1;
+}
+
+.gameShell .subtitle {
+  margin: 0 0 2px;
+  font-size: 0.9rem;
+}
+
 .header {
   display: grid;
   gap: 8px;
@@ -39,5 +69,9 @@
   .appShell {
     width: min(100% - 24px, 1180px);
     padding: 24px 0;
+  }
+
+  .gameShell .header {
+    grid-template-columns: 1fr;
   }
 }

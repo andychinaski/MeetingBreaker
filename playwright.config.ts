@@ -3,6 +3,9 @@ import { defineConfig, devices } from '@playwright/test';
 export default defineConfig({
   testDir: './tests/e2e',
   fullyParallel: true,
+  // Phaser advances its simulation in real time. Limiting concurrent browser
+  // instances prevents CPU contention from making physics-based checks flaky.
+  workers: process.env.CI ? 1 : 2,
   reporter: 'html',
   use: {
     baseURL: 'http://127.0.0.1:4173',

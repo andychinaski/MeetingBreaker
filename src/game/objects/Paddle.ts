@@ -38,6 +38,20 @@ export class Paddle extends Phaser.Physics.Arcade.Sprite {
     this.body?.updateFromGameObject();
   }
 
+  setEspressoActive(active: boolean): void {
+    this.scene.tweens.killTweensOf(this);
+    this.scene.tweens.add({
+      targets: this,
+      scaleX: active ? 1.45 : 1,
+      duration: 280,
+      ease: 'Sine.InOut',
+      onUpdate: () => {
+        this.body?.updateFromGameObject();
+        this.focusLabel.setPosition(this.x, this.y);
+      },
+    });
+  }
+
   override destroy(fromScene?: boolean): void {
     this.focusLabel.destroy(fromScene);
     super.destroy(fromScene);

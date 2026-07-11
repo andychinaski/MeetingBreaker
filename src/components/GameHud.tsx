@@ -26,6 +26,7 @@ import styles from './GameHud.module.css';
 interface GameHudProps {
   game: Phaser.Game;
   onExitToMenu: () => void;
+  onLevelResult: (result: LevelResult) => void;
 }
 
 interface HudState {
@@ -55,7 +56,11 @@ const INITIAL_HUD_STATE: HudState = {
   activeBonus: 'Нет',
 };
 
-export function GameHud({ game, onExitToMenu }: GameHudProps) {
+export function GameHud({
+  game,
+  onExitToMenu,
+  onLevelResult,
+}: GameHudProps) {
   const [hud, setHud] = useState(INITIAL_HUD_STATE);
   const [notice, setNotice] = useState<string | null>(null);
   const [resultState, setResultState] = useState<ResultState | null>(null);
@@ -102,16 +107,24 @@ export function GameHud({ game, onExitToMenu }: GameHudProps) {
       noticeTimer.current = setTimeout(() => setNotice(null), 1_800);
     };
     const handlePowerUp = (payload: PowerUpActivatedPayload) => {
-      setHud((current) => ({ ...current, activeBonus: payload.title }));
+      setHud((current) => ({
+        ...current,
+        activeBonus:
+          payload.activePowerUps.length > 0
+            ? payload.activePowerUps.join(', ')
+            : payload.title,
+      }));
     };
     const handlePause = (payload: PauseChangedPayload) => {
       setPaused(payload.paused);
     };
     const handleVictory = (payload: LevelCompletedPayload) => {
       setResultState({ outcome: 'victory', result: payload.result });
+      onLevelResult(payload.result);
     };
     const handleDefeat = (payload: GameOverPayload) => {
       setResultState({ outcome: 'defeat', result: payload.result });
+      onLevelResult(payload.result);
     };
 
     game.events.on(GAME_EVENTS.GAME_STARTED, handleStarted);
@@ -137,7 +150,7 @@ export function GameHud({ game, onExitToMenu }: GameHudProps) {
         clearTimeout(noticeTimer.current);
       }
     };
-  }, [game]);
+  }, [game, onLevelResult]);
 
   const restartLevel = () => {
     game.events.emit(GAME_COMMANDS.RESTART_LEVEL);

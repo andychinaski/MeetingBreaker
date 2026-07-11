@@ -6,6 +6,7 @@ import {
   PADDLE_TEXTURE,
   PADDLE_WIDTH,
   PARTICLE_TEXTURE,
+  POWER_UP_TEXTURE,
 } from '../config/gameplay';
 
 export class BootScene extends Phaser.Scene {
@@ -17,6 +18,7 @@ export class BootScene extends Phaser.Scene {
     this.createPaddleTexture();
     this.createBallTexture();
     this.createParticleTexture();
+    this.createPowerUpTexture();
     this.scene.start('GameScene');
   }
 
@@ -58,6 +60,20 @@ export class BootScene extends Phaser.Scene {
     graphics.fillStyle(0xffffff, 1);
     graphics.fillRoundedRect(0, 0, 7, 7, 2);
     graphics.generateTexture(PARTICLE_TEXTURE, 7, 7);
+    graphics.destroy();
+  }
+
+  private createPowerUpTexture(): void {
+    if (this.textures.exists(POWER_UP_TEXTURE)) {
+      return;
+    }
+
+    const graphics = this.make.graphics({ x: 0, y: 0 }, false);
+    graphics.fillStyle(0xffffff, 1);
+    graphics.fillCircle(15, 15, 14);
+    graphics.lineStyle(2, 0xffffff, 0.75);
+    graphics.strokeCircle(15, 15, 13);
+    graphics.generateTexture(POWER_UP_TEXTURE, 30, 30);
     graphics.destroy();
   }
 }

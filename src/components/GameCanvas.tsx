@@ -2,12 +2,27 @@ import { useEffect, useRef, useState } from 'react';
 import Phaser from 'phaser';
 import { createGameConfig } from '../game/config/gameConfig';
 import { GameHud } from './GameHud';
+import type { LevelResult } from '../game/types/game';
+import {
+  SETTINGS_REGISTRY_KEY,
+  type UserSettings,
+} from '../services/storageService';
 import styles from './GameCanvas.module.css';
 
-export function GameCanvas() {
+interface GameCanvasProps {
+  settings: UserSettings;
+  onExitToMenu: () => void;
+  onLevelResult: (result: LevelResult) => void;
+}
+
+export function GameCanvas({
+  settings,
+  onExitToMenu,
+  onLevelResult,
+}: GameCanvasProps) {
   const containerRef = useRef<HTMLDivElement>(null);
+  const initialSettings = useRef(settings);
   const [game, setGame] = useState<Phaser.Game | null>(null);
-  const [inMenu, setInMenu] = useState(false);
 
   useEffect(() => {
     const container = containerRef.current;
@@ -17,6 +32,7 @@ export function GameCanvas() {
     }
 
     const game = new Phaser.Game(createGameConfig(container));
+    game.registry.set(SETTINGS_REGISTRY_KEY, initialSettings.current);
     setGame(game);
 
     return () => {
@@ -25,36 +41,19 @@ export function GameCanvas() {
     };
   }, []);
 
-  const exitToMenu = () => {
-    if (!game) {
-      return;
-    }
-
-    game.scene.stop('GameScene');
-    setInMenu(true);
-  };
-
-  const startFromMenu = () => {
-    if (!game) {
-      return;
-    }
-
-    setInMenu(false);
-    game.scene.start('GameScene');
-  };
+  useEffect(() => {
+    game?.registry.set(SETTINGS_REGISTRY_KEY, settings);
+  }, [game, settings]);
 
   return (
     <section className={styles.gameFrame} aria-label="Игровое поле">
       <div ref={containerRef} className={styles.canvasContainer} />
-      {game && !inMenu && <GameHud game={game} onExitToMenu={exitToMenu} />}
-      {inMenu && (
-        <div className={styles.exitMenu}>
-          <p>Рабочая неделя завершена</p>
-          <h2>Meeting Breaker</h2>
-          <button type="button" onClick={startFromMenu}>
-            Начать работу
-          </button>
-        </div>
+      {game && (
+        <GameHud
+          game={game}
+          onExitToMenu={onExitToMenu}
+          onLevelResult={onLevelResult}
+        />
       )}
       <div className={styles.statusBar}>
         <span>A / D или ← / → · движение</span>

@@ -44,11 +44,15 @@ export interface MeetingDestroyedPayload {
   score: number;
   freedMinutes: number;
   required: boolean;
+  dropChance: number;
+  x: number;
+  y: number;
 }
 
 export interface PowerUpActivatedPayload {
   powerUpId: string;
   title: string;
+  activePowerUps: string[];
 }
 
 export interface PauseChangedPayload {

@@ -263,6 +263,9 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
       score: this.meetingType.score,
       freedMinutes: this.meetingType.freedMinutes,
       required: this.config.required ?? true,
+      dropChance: this.meetingType.dropChance,
+      x: this.x,
+      y: this.y,
     };
     this.scene.game.events.emit(GAME_EVENTS.MEETING_DESTROYED, payload);
   }

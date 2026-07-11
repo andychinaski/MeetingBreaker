@@ -1,0 +1,91 @@
+.backdrop {
+  position: fixed;
+  z-index: 100;
+  inset: 0;
+  display: grid;
+  padding: 24px;
+  place-items: center;
+  background: rgb(2 6 23 / 76%);
+  backdrop-filter: blur(8px);
+}
+
+.modal {
+  width: min(440px, 100%);
+  padding: 26px;
+  border: 1px solid var(--color-border);
+  border-radius: 18px;
+  color: var(--color-text);
+  background: var(--color-surface);
+  box-shadow: var(--shadow-card);
+}
+
+.kicker {
+  margin: 0 0 6px;
+  color: var(--color-accent);
+  font-size: 0.68rem;
+  font-weight: 900;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.modal h2 {
+  margin: 0 0 22px;
+  font-size: 2rem;
+}
+
+.checkboxRow,
+.field {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.checkboxRow {
+  align-items: center;
+}
+
+.field {
+  flex-direction: column;
+}
+
+.field span,
+.checkboxRow span {
+  color: var(--color-text-muted);
+  font-size: 0.85rem;
+  font-weight: 700;
+}
+
+.field select {
+  padding: 10px;
+  border: 1px solid var(--color-border);
+  border-radius: 9px;
+  color: var(--color-text);
+  background: var(--color-background);
+}
+
+.actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  margin-top: 24px;
+}
+
+.primary,
+.secondary {
+  padding: 10px 16px;
+  border-radius: 9px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.primary {
+  border: 0;
+  color: #082f49;
+  background: var(--color-accent);
+}
+
+.secondary {
+  border: 1px solid var(--color-border);
+  color: var(--color-text);
+  background: transparent;
+}

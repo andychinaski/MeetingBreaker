@@ -11,3 +11,4 @@ export const WORLD_PADDING = 24;
 export const PADDLE_TEXTURE = 'paddle';
 export const BALL_TEXTURE = 'ball';
 export const PARTICLE_TEXTURE = 'meeting-particle';
+export const POWER_UP_TEXTURE = 'power-up';
