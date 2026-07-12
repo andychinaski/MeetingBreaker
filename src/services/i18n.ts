@@ -69,6 +69,7 @@ export const ru = {
   'tutorial.pause': 'Игру можно поставить на паузу.',
   'tutorial.independent': 'Теперь очисти календарь самостоятельно.',
   'tutorial.complete': 'Обучение завершено.',
+  'tutorial.success': 'Готово!',
 } as const;
 
 export type TranslationKey = keyof typeof ru;
@@ -102,6 +103,7 @@ export const en: Record<TranslationKey, string> = {
   'tutorial.meeting': 'Break a meeting. Some meetings need several hits.', 'tutorial.score': 'Meetings award score and freed time. Consecutive hits build a combo.',
   'tutorial.coffee': 'Lose a ball — spend a cup of coffee.', 'tutorial.bonus': 'Catch the guaranteed Espresso Shot.', 'tutorial.pause': 'You can pause the game.',
   'tutorial.independent': 'Now clear the calendar on your own.', 'tutorial.complete': 'Tutorial completed.',
+  'tutorial.success': 'Done!',
 };
 
 export function t(language: Language, key: TranslationKey): string {

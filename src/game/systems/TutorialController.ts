@@ -3,7 +3,14 @@ import type { TranslationKey } from '../../services/i18n';
 export type TutorialEvent = 'paddle-moved' | 'ball-launched' | 'meeting-destroyed' | 'ball-lost' | 'espresso-collected' | 'paused' | 'calendar-cleared';
 export type TutorialAction = 'move' | 'launch' | 'play' | 'pause';
 export type TutorialTarget = 'paddle' | 'ball' | 'meeting' | 'score' | 'coffee' | 'bonus' | 'pause' | 'calendar';
-export type TutorialPhase = 'explanation' | 'action' | 'completed';
+export type TutorialPhase = 'explanation' | 'action' | 'success' | 'completed';
+
+export interface TutorialSpotlightRect {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
 
 export interface TutorialStep {
   id: string;
@@ -19,6 +26,7 @@ export interface TutorialSnapshot {
   step?: TutorialStep;
   phase: TutorialPhase;
   index: number;
+  spotlight?: TutorialSpotlightRect;
 }
 
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
@@ -56,6 +64,12 @@ export class TutorialController {
 
   notify(event: TutorialEvent): boolean {
     if (this.phase !== 'action' || this.current?.completionEvent !== event) return false;
+    this.phase = 'success';
+    return true;
+  }
+
+  completeTransition(): boolean {
+    if (this.phase !== 'success') return false;
     this.advance();
     return true;
   }

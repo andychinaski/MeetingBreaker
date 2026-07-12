@@ -1,14 +1,9 @@
 .overlay { position: absolute; z-index: 35; inset: 0 0 46px; overflow: hidden; }
 .explanation { pointer-events: auto; }
 .action { pointer-events: none; }
-.spotlight { position: absolute; z-index: 1; border: 3px solid var(--accent-primary); border-radius: 14px; box-shadow: 0 0 0 9999px rgb(2 6 23 / 78%), 0 0 24px var(--accent-primary); transition: all 180ms ease; }
-.paddle { left: 42%; top: 82%; width: 16%; height: 8%; }
-.ball { left: 47%; top: 75%; width: 6%; aspect-ratio: 1; border-radius: 50%; }
-.meeting, .calendar { left: 17%; top: 22%; width: 66%; height: 48%; }
-.score { left: 19%; top: 8px; width: 12%; height: 56px; }
-.coffee { left: 57%; top: 8px; width: 10%; height: 56px; }
-.bonus { left: 68%; top: 8px; width: 12%; height: 56px; }
-.pause { right: 12px; top: 8px; width: 90px; height: 56px; }
+.spotlight { position: absolute; z-index: 1; border: 3px solid var(--accent-primary); border-radius: 14px; box-shadow: 0 0 0 9999px rgb(2 6 23 / 78%), 0 0 24px var(--accent-primary); transition: left 180ms ease, top 180ms ease, width 180ms ease, height 180ms ease; }
+.round { border-radius: 999px; }
+.success .spotlight { border-color: #45c486; box-shadow: 0 0 0 9999px rgb(2 6 23 / 70%), 0 0 28px #45c486; }
 .card { position: absolute; z-index: 2; top: 50%; left: 50%; width: min(560px, calc(100% - 36px)); padding: 24px; transform: translate(-50%, -50%); border: 1px solid var(--accent-primary); border-radius: 18px; color: var(--color-text); background: var(--color-surface); box-shadow: var(--shadow-card); pointer-events: auto; }
 .action .card { top: 88px; padding: 13px 18px; transform: translateX(-50%); }
 .counter { margin: 0 0 5px; color: var(--accent-primary); font-size: .68rem; font-weight: 900; letter-spacing: .1em; }
@@ -18,4 +13,4 @@
 .primary, .secondary { padding: 10px 14px; border-radius: 9px; font-weight: 800; cursor: pointer; }
 .primary { border: 1px solid var(--accent-primary); color: var(--accent-text); background: var(--accent-primary); }
 .secondary { border: 1px solid var(--color-border); color: var(--color-text); background: transparent; }
-@media (max-width: 700px) { .action .card { top: 72px; } .score, .coffee, .bonus { top: 4px; height: 48px; } }
+@media (max-width: 700px) { .action .card { top: 72px; } }

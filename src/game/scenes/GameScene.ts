@@ -66,7 +66,7 @@ import {
 import { GAME_MODES, LEVEL_REGISTRY_KEY, MODE_REGISTRY_KEY, TUTORIAL_REGISTRY_KEY, type GameModeConfig } from '../types/mode';
 import type { MeetingBlockConfig, MeetingType, WorkDay } from '../types/meeting';
 import type { LevelConfig } from '../types/level';
-import { TutorialController, type TutorialEvent } from '../systems/TutorialController';
+import { TutorialController, type TutorialEvent, type TutorialSpotlightRect, type TutorialTarget } from '../systems/TutorialController';
 import { GAME_THEME_REGISTRY_KEY, getGameTheme, type GameTheme } from '../config/theme';
 import {
   CONTROL_SCHEME_REGISTRY_KEY,
@@ -101,6 +101,9 @@ export class GameScene extends Phaser.Scene {
   private createdMeetingCount = 0;
   private wave = 1;
   private tutorialController?: TutorialController;
+  private tutorialTransitionTimer?: number;
+  private lastTutorialSpotlight?: TutorialSpotlightRect;
+  private lastTutorialSpotlightStepId?: string;
   private sessionMeetings: MeetingBlockConfig[] = [];
   private calendarGrid?: CalendarGrid;
   private boundsGraphics?: Phaser.GameObjects.Graphics;
@@ -560,7 +563,6 @@ export class GameScene extends Phaser.Scene {
 
     if (completedNow && this.tutorialController) {
       this.advanceTutorial('calendar-cleared');
-      if (this.tutorialController.isCompleted) this.finishWithVictory();
     } else if (completedNow && !this.mode.endless) {
       this.finishWithVictory();
     } else if (completedNow) {
@@ -748,7 +750,21 @@ export class GameScene extends Phaser.Scene {
   }
 
   private advanceTutorial(event: TutorialEvent): void {
-    if (this.tutorialController?.notify(event)) this.publishTutorialStep();
+    const controller = this.tutorialController;
+    if (!controller?.notify(event)) return;
+    this.publishTutorialStep();
+    if (this.tutorialTransitionTimer !== undefined) window.clearTimeout(this.tutorialTransitionTimer);
+    this.tutorialTransitionTimer = window.setTimeout(() => {
+      this.tutorialTransitionTimer = undefined;
+      if (!controller.completeTransition()) return;
+      if (this.gameStatus === 'paused') {
+        this.scene.resume();
+        this.gameStatus = 'playing';
+        this.game.events.emit(GAME_EVENTS.PAUSE_CHANGED, { paused: false });
+      }
+      this.publishTutorialStep();
+      if (controller.isCompleted && event === 'calendar-cleared') this.finishWithVictory();
+    }, 750);
   }
 
   private readonly handleTutorialContinue = (): void => {
@@ -761,18 +777,19 @@ export class GameScene extends Phaser.Scene {
       this.game.events.emit(GAME_EVENTS.PAUSE_CHANGED, { paused: false });
     }
     const step = controller.current;
-    this.publishTutorialStep();
-    if (controller.snapshot.phase !== 'action') return;
-    if (step?.setup === 'lose-ball') this.time.delayedCall(250, () => this.handleAllBallsLost());
+    if (controller.snapshot.phase !== 'action') { this.publishTutorialStep(); return; }
     if (step?.setup === 'spawn-espresso') this.spawnTutorialEspresso();
+    this.publishTutorialStep();
+    if (step?.setup === 'lose-ball') this.time.delayedCall(250, () => this.handleAllBallsLost());
     if (step?.id === 'independent' && this.levelProgress.remainingRequired === 0) {
       this.advanceTutorial('calendar-cleared');
-      this.finishWithVictory();
     }
   };
 
   private readonly handleTutorialSkip = (): void => {
     if (!this.tutorialController) return;
+    if (this.tutorialTransitionTimer !== undefined) window.clearTimeout(this.tutorialTransitionTimer);
+    this.tutorialTransitionTimer = undefined;
     this.tutorialController.skip();
     this.physics.resume();
     if (this.gameStatus === 'paused') {
@@ -790,13 +807,36 @@ export class GameScene extends Phaser.Scene {
   }
 
   private publishTutorialStep(): void {
-    const snapshot = this.tutorialController?.snapshot;
-    const step = snapshot?.step;
+    const baseSnapshot = this.tutorialController?.snapshot;
+    const step = baseSnapshot?.step;
     this.game.canvas.dataset.tutorialStep = step?.id ?? 'completed';
-    if (!snapshot) return;
+    if (!baseSnapshot) return;
+    const spotlight = baseSnapshot.phase === 'success' && this.lastTutorialSpotlightStepId === step?.id
+      ? this.lastTutorialSpotlight
+      : step?.spotlightTarget ? this.getTutorialSpotlight(step.spotlightTarget) : undefined;
+    if (baseSnapshot.phase !== 'success') {
+      this.lastTutorialSpotlight = spotlight;
+      this.lastTutorialSpotlightStepId = step?.id;
+    }
+    const snapshot = { ...baseSnapshot, spotlight };
     this.game.registry.set(TUTORIAL_STATE_REGISTRY_KEY, snapshot);
     this.game.events.emit(GAME_EVENTS.TUTORIAL_CHANGED, snapshot);
-    if (snapshot.phase === 'explanation') this.physics.pause();
+    if (snapshot.phase === 'explanation' || snapshot.phase === 'success') this.physics.pause();
+  }
+
+  private getTutorialSpotlight(target: TutorialTarget): TutorialSpotlightRect | undefined {
+    if (target === 'paddle') return { x: this.paddle.x - this.paddle.displayWidth / 2, y: this.paddle.y - this.paddle.displayHeight / 2, width: this.paddle.displayWidth, height: this.paddle.displayHeight };
+    if (target === 'ball') return { x: this.ball.x - this.ball.displayWidth / 2, y: this.ball.y - this.ball.displayHeight / 2, width: this.ball.displayWidth, height: this.ball.displayHeight };
+    if (target === 'meeting') {
+      const zone = this.meetingBlocks.find((block) => !block.destroyed)?.collisionZone;
+      if (zone) return { x: zone.x - zone.displayWidth / 2, y: zone.y - zone.displayHeight / 2, width: zone.displayWidth, height: zone.displayHeight };
+    }
+    if (target === 'calendar') return { x: DEFAULT_CALENDAR_LAYOUT.x, y: DEFAULT_CALENDAR_LAYOUT.y, width: DEFAULT_CALENDAR_LAYOUT.width, height: DEFAULT_CALENDAR_LAYOUT.height };
+    if (target === 'bonus') {
+      const bonus = this.powerUps.find((powerUp) => powerUp.powerUpType === 'espresso-shot');
+      if (bonus) return { x: bonus.x - bonus.displayWidth / 2, y: bonus.y - bonus.displayHeight / 2, width: bonus.displayWidth, height: bonus.displayHeight };
+    }
+    return undefined;
   }
 
   private updateRegistryState(): void {
@@ -856,6 +896,7 @@ export class GameScene extends Phaser.Scene {
 
   private cleanupScene(): void {
     this.waveTimer?.remove(false);
+    if (this.tutorialTransitionTimer !== undefined) window.clearTimeout(this.tutorialTransitionTimer);
     this.espressoTimer?.remove(false);
     this.soundSystem.destroy();
     this.inputController.destroy();

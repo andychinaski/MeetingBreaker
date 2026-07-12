@@ -15,6 +15,9 @@ describe('TutorialController', () => {
     expect(tutorial.notify('ball-launched')).toBe(false);
     expect(tutorial.notify('paddle-moved')).toBe(true);
     expect(tutorial.notify('paddle-moved')).toBe(false);
+    expect(tutorial.snapshot.phase).toBe('success');
+    expect(tutorial.current?.id).toBe('move');
+    expect(tutorial.completeTransition()).toBe(true);
     expect(tutorial.current?.id).toBe('info');
   });
   it('can be skipped', () => { const tutorial = new TutorialController(); tutorial.skip(); expect(tutorial.isCompleted).toBe(true); });

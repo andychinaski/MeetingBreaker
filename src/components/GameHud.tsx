@@ -188,7 +188,7 @@ export function GameHud({
           <span>{t(language, hudConfig.context === 'level' ? 'game.level' : 'game.wave')}</span>
           <strong>{hudConfig.context === 'level' ? hud.levelTitle : hud.wave}</strong>
         </div>
-        <div className={styles.statChip}>
+        <div className={styles.statChip} data-tutorial-anchor="score">
           <span>{t(language, 'game.score')}</span>
           <strong>{hud.score.toLocaleString(language === 'ru' ? 'ru-RU' : 'en-US')}</strong>
         </div>
@@ -202,19 +202,20 @@ export function GameHud({
             ×{hud.combo} · {hud.multiplier.toFixed(2)}
           </strong>
         </div>
-        {hudConfig.showCoffee && hud.coffeeEnabled && <div className={styles.statChip}>
+        {hudConfig.showCoffee && hud.coffeeEnabled && <div className={styles.statChip} data-tutorial-anchor="coffee">
           <span>{t(language, 'game.coffee')}</span>
           <strong aria-label={`${t(language, 'game.coffee')}: ${hud.coffeeCups}`}>
             {hud.coffeeCups > 0 ? '☕'.repeat(hud.coffeeCups) : '—'}
           </strong>
         </div>}
-        <div className={styles.statChip}>
+        <div className={styles.statChip} data-tutorial-anchor="bonus">
           <span>{t(language, 'game.bonus')}</span>
           <strong>{hud.activeBonus}</strong>
         </div>
         <button
           type="button"
           className={styles.pauseButton}
+          data-tutorial-anchor="pause"
           onClick={togglePause}
         >
           {t(language, paused ? 'common.continue' : 'game.pause')}
