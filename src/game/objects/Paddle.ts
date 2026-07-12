@@ -6,8 +6,6 @@ import {
 } from '../config/gameplay';
 
 export class Paddle extends Phaser.Physics.Arcade.Sprite {
-  private readonly focusLabel: Phaser.GameObjects.Text;
-
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, PADDLE_TEXTURE);
 
@@ -21,20 +19,10 @@ export class Paddle extends Phaser.Physics.Arcade.Sprite {
     const body = this.body as Phaser.Physics.Arcade.Body;
     body.setAllowGravity(false);
 
-    this.focusLabel = scene.add
-      .text(x, y, 'FOCUS TIME', {
-        color: '#ffffff',
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '13px',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setDepth(3);
   }
 
   moveTo(x: number, minimumX: number, maximumX: number): void {
     this.x = Phaser.Math.Clamp(x, minimumX, maximumX);
-    this.focusLabel.setPosition(this.x, this.y);
     this.body?.updateFromGameObject();
   }
 
@@ -47,13 +35,7 @@ export class Paddle extends Phaser.Physics.Arcade.Sprite {
       ease: 'Sine.InOut',
       onUpdate: () => {
         this.body?.updateFromGameObject();
-        this.focusLabel.setPosition(this.x, this.y);
       },
     });
-  }
-
-  override destroy(fromScene?: boolean): void {
-    this.focusLabel.destroy(fromScene);
-    super.destroy(fromScene);
   }
 }

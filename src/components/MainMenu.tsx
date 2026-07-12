@@ -1,4 +1,3 @@
-import type { LevelConfig } from '../game/types/level';
 import { formatFreedTime } from '../game/systems/ScoreSystem';
 import type { PlayerProgress } from '../services/storageService';
 import styles from './MainMenu.module.css';
@@ -6,10 +5,7 @@ import { t } from '../services/i18n';
 import type { Language } from '../services/storageService';
 
 interface MainMenuProps {
-  levels: readonly LevelConfig[];
-  selectedLevelId: string;
   progress: PlayerProgress;
-  onSelectLevel: (levelId: string) => void;
   playerName: string | null;
   language: Language;
   onStart: () => void;
@@ -19,52 +15,31 @@ interface MainMenuProps {
 }
 
 export function MainMenu({
-  levels,
-  selectedLevelId,
   progress,
   playerName,
   language,
-  onSelectLevel,
   onStart,
   onOpenSettings,
   onLeaderboard,
   onInfo,
 }: MainMenuProps) {
   return (
-    <section className={styles.menuCard} aria-label="Главное меню">
+    <section className={styles.menuCard} aria-label={t(language, 'menu.aria')}>
       <div>
-        <p className={styles.kicker}>{playerName ? `Привет, ${playerName}` : 'План на неделю'}</p>
+        <p className={styles.kicker}>{playerName ? `${t(language, 'menu.greeting')}, ${playerName}` : t(language, 'menu.weekPlan')}</p>
         <p className={styles.description}>
-          Разбей все встречи и сохрани кофе до пятницы.
+          {t(language, 'menu.description')}
         </p>
       </div>
 
-      <label className={styles.levelSelect}>
-        <span>Уровень</span>
-        <select
-          value={selectedLevelId}
-          onChange={(event) => onSelectLevel(event.target.value)}
-        >
-          {levels.map((level) => (
-            <option
-              key={level.id}
-              value={level.id}
-              disabled={!progress.unlockedLevelIds.includes(level.id)}
-            >
-              {level.title}
-            </option>
-          ))}
-        </select>
-      </label>
-
       <dl className={styles.records}>
         <div>
-          <dt>Лучший результат</dt>
-          <dd>{progress.bestScore.toLocaleString('ru-RU')}</dd>
+          <dt>{t(language, 'menu.bestScore')}</dt>
+          <dd>{progress.bestScore.toLocaleString(language === 'ru' ? 'ru-RU' : 'en-US')}</dd>
         </div>
         <div>
-          <dt>Максимум свободного времени</dt>
-          <dd>{formatFreedTime(progress.maxFreedMinutes)}</dd>
+          <dt>{t(language, 'menu.maxFreed')}</dt>
+          <dd>{formatFreedTime(progress.maxFreedMinutes, language)}</dd>
         </div>
       </dl>
 

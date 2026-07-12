@@ -34,6 +34,7 @@ const result: LevelResult = {
 describe('storageService', () => {
   it('returns defaults when storage is empty', () => {
     expect(loadProfile(new MemoryStorage())).toEqual(DEFAULT_PROFILE);
+    expect(loadProfile(new MemoryStorage()).preferences.controlScheme).toBeNull();
   });
 
   it('writes and reads settings', () => {

@@ -25,6 +25,8 @@ import {
 import { DEFAULT_SETTINGS, SETTINGS_REGISTRY_KEY, type UserSettings } from '../../services/storageService';
 import type { GameTheme } from '../config/theme';
 import { getGameTheme } from '../config/theme';
+import { truncateMeetingTitle } from '../systems/meetingTitle';
+import { t } from '../../services/i18n';
 
 type VisualDamageState = 'normal' | 'damaged' | 'severely-damaged';
 
@@ -42,6 +44,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
   private readonly behaviorContext: MeetingBehaviorContext;
   private surfaceColor = 0x172033;
   private shadeColor = 0x0f172a;
+  private readonly language: UserSettings['language'];
 
   constructor(
     scene: Phaser.Scene,
@@ -58,6 +61,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
     this.blockWidth = rectangle.width;
     this.blockHeight = rectangle.height;
     const settings = (scene.game.registry.get(SETTINGS_REGISTRY_KEY) as UserSettings | undefined) ?? DEFAULT_SETTINGS;
+    this.language = settings.language;
     const baseColor = Number.parseInt(meetingType.color.slice(1), 16);
     this.blockColor = settings.meetingPalette === 'pastel'
       ? Phaser.Display.Color.ValueToColor(baseColor).lighten(28).color
@@ -171,8 +175,9 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
     const top = -this.blockHeight / 2;
     const compact = this.blockHeight < 30;
     const medium = this.blockHeight < 58;
-    const title = compact ? this.meetingType.shortTitle : this.config.title;
-    const titleSize = compact ? 10 : 11;
+    const rawTitle = compact ? this.meetingType.shortTitle : this.config.title;
+    const title = truncateMeetingTitle(rawTitle, Math.max(7, Math.floor((this.blockWidth - 18) / (compact ? 7 : 7.5))));
+    const titleSize = compact ? 12 : 13;
     const titleY = compact ? top + 3 : top + 6;
 
     const titleText = this.scene.add.text(left, titleY, title, {
@@ -180,9 +185,8 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
       fontFamily: 'Arial, sans-serif',
       fontSize: `${titleSize}px`,
       fontStyle: 'bold',
-      wordWrap: { width: this.blockWidth - 18, useAdvancedWrap: false },
     });
-    titleText.setCrop(0, 0, this.blockWidth - 18, compact ? 13 : 29);
+    titleText.setCrop(0, 0, this.blockWidth - 18, compact ? 16 : 31);
     this.add(titleText);
 
     if (compact) {
@@ -192,7 +196,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
     const endMinutes = this.config.startMinutes + this.config.durationMinutes;
     const timeText = `${formatCalendarTime(
       this.config.startMinutes,
-    )}–${formatCalendarTime(endMinutes)} · ${this.config.durationMinutes} мин`;
+    )}–${formatCalendarTime(endMinutes)} · ${this.config.durationMinutes} ${t(this.language, 'game.minutes')}`;
     const details = this.scene.add.text(
       left,
       top + (medium ? 27 : 36),
@@ -210,7 +214,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
       const attendees = this.scene.add.text(
         left,
         top + 52,
-        `${this.config.attendeeCount} участников`,
+        `${this.config.attendeeCount} ${t(this.language, 'game.participants')}`,
         {
           color: '#94a3b8',
           fontFamily: 'Arial, sans-serif',
@@ -368,7 +372,7 @@ export class MeetingBlock extends Phaser.GameObjects.Container {
     this.scene.time.delayedCall(500, () => particles.destroy());
 
     const freedTime = this.scene.add
-      .text(this.x, this.y, `+${this.meetingType.freedMinutes} мин`, {
+      .text(this.x, this.y, `+${this.meetingType.freedMinutes} ${t(this.language, 'game.minutes')}`, {
         color: '#f8fafc',
         fontFamily: 'Arial, sans-serif',
         fontSize: '16px',

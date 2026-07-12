@@ -5,9 +5,11 @@ interface ModalProps {
   title: string;
   children: React.ReactNode;
   onClose: () => void;
+  closable?: boolean;
+  closeLabel?: string;
 }
 
-export function Modal({ title, children, onClose }: ModalProps) {
+export function Modal({ title, children, onClose, closable = true, closeLabel = 'Закрыть' }: ModalProps) {
   const dialogRef = useRef<HTMLElement>(null);
   const openerRef = useRef<HTMLElement | null>(null);
   const titleId = useId();
@@ -19,7 +21,7 @@ export function Modal({ title, children, onClose }: ModalProps) {
     const focusable = () => [...(dialog?.querySelectorAll<HTMLElement>('button:not([disabled]), input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [href], [tabindex]:not([tabindex="-1"])') ?? [])];
     focusable()[0]?.focus();
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') { event.preventDefault(); onClose(); return; }
+      if (event.key === 'Escape' && closable) { event.preventDefault(); onClose(); return; }
       if (event.key !== 'Tab') return;
       const items = focusable();
       if (!items.length) return;
@@ -30,11 +32,11 @@ export function Modal({ title, children, onClose }: ModalProps) {
     };
     document.addEventListener('keydown', handleKeyDown);
     return () => { document.removeEventListener('keydown', handleKeyDown); opener?.focus(); };
-  }, [onClose]);
+  }, [closable, onClose]);
 
-  return <div className={styles.backdrop} onMouseDown={(event) => { if (event.target === event.currentTarget) onClose(); }}>
+  return <div className={styles.backdrop} onMouseDown={(event) => { if (closable && event.target === event.currentTarget) onClose(); }}>
     <section ref={dialogRef} className={styles.modal} role="dialog" aria-modal="true" aria-labelledby={titleId}>
-      <header className={styles.header}><h2 id={titleId}>{title}</h2><button type="button" className={styles.closeButton} aria-label="Закрыть" onClick={onClose}>×</button></header>
+      <header className={styles.header}><h2 id={titleId}>{title}</h2>{closable && <button type="button" className={styles.closeButton} aria-label={closeLabel} onClick={onClose}>×</button>}</header>
       {children}
     </section>
   </div>;

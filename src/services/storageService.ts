@@ -17,7 +17,7 @@ export interface UserSettings {
 }
 export interface PlayerPreferences {
   playerName: string | null;
-  controlScheme: ControlScheme;
+  controlScheme: ControlScheme | null;
   tutorialCompleted: boolean;
   skipTutorialPrompt: boolean;
   skipControlPrompt: boolean;
@@ -51,7 +51,7 @@ export interface PlayerProfile {
 export const STORAGE_KEY = 'meeting-breaker-profile';
 export const SETTINGS_REGISTRY_KEY = 'meeting-breaker-settings';
 export const DEFAULT_SETTINGS: UserSettings = { soundEnabled: true, volume: 0.65, musicEnabled: true, musicVolume: 0.45, theme: 'dark', meetingPalette: 'default', language: 'ru' };
-export const DEFAULT_PREFERENCES: PlayerPreferences = { playerName: null, controlScheme: 'keyboard', tutorialCompleted: false, skipTutorialPrompt: false, skipControlPrompt: false };
+export const DEFAULT_PREFERENCES: PlayerPreferences = { playerName: null, controlScheme: null, tutorialCompleted: false, skipTutorialPrompt: false, skipControlPrompt: false };
 export const DEFAULT_PROGRESS: PlayerProgress = { bestScore: 0, maxFreedMinutes: 0, unlockedLevelIds: ['calendar-overload'], levelBestScores: {} };
 export const DEFAULT_PROFILE: PlayerProfile = { version: 2, settings: DEFAULT_SETTINGS, preferences: DEFAULT_PREFERENCES, progress: DEFAULT_PROGRESS, leaderboard: [] };
 type StorageLike = Pick<Storage, 'getItem' | 'setItem'>;
@@ -89,7 +89,7 @@ function sanitizeProfile(value: unknown): PlayerProfile {
     },
     preferences: {
       playerName: typeof preferences.playerName === 'string' ? normalizePlayerName(preferences.playerName) : null,
-      controlScheme: oneOf(preferences.controlScheme, ['keyboard', 'mouse'], 'keyboard'),
+      controlScheme: preferences.controlScheme === 'keyboard' || preferences.controlScheme === 'mouse' ? preferences.controlScheme : null,
       tutorialCompleted: Boolean(preferences.tutorialCompleted),
       skipTutorialPrompt: Boolean(preferences.skipTutorialPrompt),
       skipControlPrompt: Boolean(preferences.skipControlPrompt),

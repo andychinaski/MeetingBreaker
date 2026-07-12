@@ -1,5 +1,6 @@
 import type { MeetingDestroyedPayload } from '../events/gameEvents';
 import type { LevelResult, ScoreSnapshot } from '../types/game';
+import type { Language } from '../../services/storageService';
 
 export function calculateComboMultiplier(combo: number): number {
   if (combo <= 0) {
@@ -9,20 +10,20 @@ export function calculateComboMultiplier(combo: number): number {
   return Math.min(1 + Math.floor((combo - 1) / 3) * 0.25, 2);
 }
 
-export function formatFreedTime(minutes: number): string {
+export function formatFreedTime(minutes: number, language: Language = 'ru'): string {
   const safeMinutes = Math.max(0, Math.floor(minutes));
   const hours = Math.floor(safeMinutes / 60);
   const remainingMinutes = safeMinutes % 60;
 
   if (hours === 0) {
-    return `${remainingMinutes} мин`;
+    return `${remainingMinutes} ${language === 'ru' ? 'мин' : 'min'}`;
   }
 
   if (remainingMinutes === 0) {
-    return `${hours} ч`;
+    return `${hours} ${language === 'ru' ? 'ч' : 'h'}`;
   }
 
-  return `${hours} ч ${remainingMinutes} мин`;
+  return `${hours} ${language === 'ru' ? 'ч' : 'h'} ${remainingMinutes} ${language === 'ru' ? 'мин' : 'min'}`;
 }
 
 export function calculateRating(score: number): string {

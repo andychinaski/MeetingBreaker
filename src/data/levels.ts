@@ -45,7 +45,10 @@ export const TUTORIAL_LEVEL: LevelConfig = {
   initialCoffeeCups: 3,
   meetings: [
     { ...meeting(0, 'daily', 1), id: 'tutorial-basic', title: 'Обычная встреча' },
-    { ...meeting(6, 'refinement', 2), id: 'tutorial-durable', title: 'Встреча с 2 HP' },
+    { ...meeting(2, 'team-sync', 1), id: 'tutorial-sync-1', title: 'Командная встреча' },
+    { ...meeting(4, 'daily', 1), id: 'tutorial-daily-2', title: 'Ежедневная встреча' },
+    { ...meeting(6, 'team-sync', 1), id: 'tutorial-sync-2', title: 'Командная встреча' },
+    { ...meeting(8, 'daily', 1), id: 'tutorial-daily-3', title: 'Ежедневная встреча' },
   ],
 };
 

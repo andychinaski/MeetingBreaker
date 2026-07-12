@@ -13,8 +13,6 @@ import {
 } from '../systems/ballPhysics';
 
 export class Ball extends Phaser.Physics.Arcade.Sprite {
-  private readonly taskLabel: Phaser.GameObjects.Text;
-
   constructor(scene: Phaser.Scene, x: number, y: number) {
     super(scene, x, y, BALL_TEXTURE);
 
@@ -27,15 +25,6 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
     this.setMaxVelocity(MAX_BALL_SPEED, MAX_BALL_SPEED);
     this.setDepth(4);
 
-    this.taskLabel = scene.add
-      .text(x, y, 'TASK', {
-        color: '#0b1120',
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '9px',
-        fontStyle: 'bold',
-      })
-      .setOrigin(0.5)
-      .setDepth(5);
   }
 
   resetOnPaddle(paddle: Paddle): void {
@@ -80,15 +69,7 @@ export class Ball extends Phaser.Physics.Arcade.Sprite {
 
   hideForReset(): void {
     this.disableBody(true, true);
-    this.taskLabel.setVisible(false);
   }
 
-  syncLabel(): void {
-    this.taskLabel.setPosition(this.x, this.y).setVisible(this.visible);
-  }
-
-  override destroy(fromScene?: boolean): void {
-    this.taskLabel.destroy(fromScene);
-    super.destroy(fromScene);
-  }
+  syncLabel(): void {}
 }

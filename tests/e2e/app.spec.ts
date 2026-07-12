@@ -11,6 +11,8 @@ async function startGame(page: Page) {
   await expect(page.locator('canvas')).toHaveCount(0);
   await page.getByRole('button', { name: 'Играть' }).click();
   await page.getByRole('button', { name: /Прохождение/ }).click();
+  await expect(page.getByLabel('Прохождение')).toBeVisible();
+  await page.getByRole('button', { name: 'Начать уровень' }).click();
   const canvas = page.locator('canvas');
   await expect(canvas).toHaveCount(1);
   await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
@@ -28,8 +30,21 @@ test('first run validates the player and opens mode selection', async ({ page })
   await dialog.getByRole('button', { name: 'Далее' }).click();
   await dialog.getByText('Мышь').click();
   await dialog.getByRole('button', { name: 'Готово' }).click();
-  await expect(page.getByLabel('Выбор режима')).toBeVisible();
+  await expect(page.getByLabel('Игровой режим')).toBeVisible();
   await expect(page.locator('canvas')).toHaveCount(0);
+});
+
+test('an existing profile without controls must choose a scheme', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('meeting-breaker-profile', JSON.stringify({ version: 2, preferences: { playerName: 'Тестер', controlScheme: null, tutorialCompleted: true }, settings: {}, progress: { unlockedLevelIds: ['calendar-overload'] }, leaderboard: [] })));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Играть' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Выберите управление' });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Клавиатура' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Мышь' })).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Закрыть' })).toHaveCount(0);
+  await dialog.getByRole('button', { name: 'Клавиатура' }).click();
+  await expect(page.getByLabel('Игровой режим')).toBeVisible();
 });
 
 test('tutorial can be launched again from information', async ({ page }) => {
@@ -38,8 +53,28 @@ test('tutorial can be launched again from information', async ({ page }) => {
   await page.getByRole('button', { name: 'Информация' }).click();
   await page.getByRole('button', { name: 'Запустить обучение' }).click();
   const canvas = page.locator('canvas');
-  await expect(canvas).toHaveAttribute('data-tutorial-step', 'move');
-  await expect(canvas).toHaveAttribute('data-meeting-count', '2');
+  await expect(canvas).toHaveAttribute('data-tutorial-step', 'paddle');
+  await expect(canvas).toHaveAttribute('data-meeting-count', '5');
+  await expect(page.getByText('Это твоя платформа. Ею ты возвращаешь задачу в календарь.')).toBeVisible();
+  await page.getByRole('button', { name: 'Понятно, продолжить' }).click();
+  await page.keyboard.down('ArrowRight');
+  await expect(canvas).toHaveAttribute('data-tutorial-step', 'ball');
+  await page.keyboard.up('ArrowRight');
+  await page.getByRole('button', { name: 'Пропустить обучение' }).click();
+  await expect(page.getByText('Пропустить обучение?')).toBeVisible();
+  await page.getByRole('button', { name: 'Да, пропустить' }).click();
+  await expect(page.getByText('Пропустить обучение?')).toHaveCount(0);
+});
+
+test('English locale is shared by React and Phaser', async ({ page }) => {
+  await page.addInitScript(() => localStorage.setItem('meeting-breaker-profile', JSON.stringify({ version: 2, preferences: { playerName: 'Tester', controlScheme: 'keyboard', tutorialCompleted: true }, settings: { language: 'en' }, progress: { unlockedLevelIds: ['calendar-overload'] }, leaderboard: [] })));
+  await page.goto('/');
+  await expect(page.getByRole('button', { name: 'Play' })).toBeVisible();
+  await page.getByRole('button', { name: 'Play' }).click();
+  await page.getByRole('button', { name: /Campaign/ }).click();
+  await page.getByRole('button', { name: 'Start level' }).click();
+  await expect(page.getByLabel('Game statistics')).toContainText('Level');
+  await expect(page.locator('canvas')).toHaveAttribute('data-locale', 'en');
 });
 
 test('opens the calendar level and launches the ball', async ({ page }) => {
@@ -63,6 +98,11 @@ test('opens the calendar level and launches the ball', async ({ page }) => {
   await expect(canvas).toHaveAttribute('data-coffee-cups', '3');
   await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
   await expect(page.getByLabel('Игровая статистика')).toBeVisible();
+  const hudBounds = await page.getByLabel('Игровая статистика').boundingBox();
+  const canvasBounds = await canvas.boundingBox();
+  expect(hudBounds).not.toBeNull();
+  expect(canvasBounds).not.toBeNull();
+  expect(hudBounds!.y + hudBounds!.height).toBeLessThanOrEqual(canvasBounds!.y + 1);
 
   await page.keyboard.down('Space');
   await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
@@ -70,7 +110,7 @@ test('opens the calendar level and launches the ball', async ({ page }) => {
   expect(browserErrors).toEqual([]);
 });
 
-test('supports keyboard movement, mouse movement and click launch', async ({
+test('keyboard mode disables mouse movement and click launch', async ({
   page,
 }) => {
   const canvas = await startGame(page);
@@ -91,22 +131,44 @@ test('supports keyboard movement, mouse movement and click launch', async ({
     return;
   }
 
-  await page.mouse.move(
-    bounds.x + bounds.width * 0.75,
-    bounds.y + bounds.height * 0.75,
-  );
+  const keyboardX = Number(await canvas.getAttribute('data-paddle-x'));
   await page.mouse.move(
     bounds.x + bounds.width * 0.25,
     bounds.y + bounds.height * 0.75,
     { steps: 5 },
   );
-  await expect
-    .poll(async () => Number(await canvas.getAttribute('data-paddle-x')))
-    .toBeLessThan(initialPaddleX);
+  await expect.poll(async () => Number(await canvas.getAttribute('data-paddle-x'))).toBe(keyboardX);
 
   await page.mouse.down({ button: 'left' });
-  await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
   await page.mouse.up({ button: 'left' });
+  await page.keyboard.press('Space');
+  await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
+});
+
+test('mouse mode disables keyboard movement and launches with a click', async ({ page }) => {
+  const browserErrors: string[] = [];
+  page.on('pageerror', (error) => browserErrors.push(error.message));
+  page.on('console', (message) => { if (message.type() === 'error') browserErrors.push(message.text()); });
+  await page.addInitScript(() => localStorage.setItem('meeting-breaker-profile', JSON.stringify({ version: 2, preferences: { playerName: 'Тестер', controlScheme: 'mouse', tutorialCompleted: true }, settings: {}, progress: { unlockedLevelIds: ['calendar-overload'] }, leaderboard: [] })));
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Играть' }).click();
+  await page.getByRole('button', { name: /Прохождение/ }).click();
+  await page.getByRole('button', { name: 'Начать уровень' }).click();
+  const canvas = page.locator('canvas');
+  await expect(canvas).toHaveAttribute('data-control-scheme', 'mouse');
+  const initialX = Number(await canvas.getAttribute('data-paddle-x'));
+  await page.keyboard.press('ArrowRight');
+  await expect.poll(async () => Number(await canvas.getAttribute('data-paddle-x'))).toBe(initialX);
+  await canvas.scrollIntoViewIfNeeded();
+  const bounds = await canvas.boundingBox();
+  expect(bounds).not.toBeNull();
+  if (!bounds) return;
+  await page.mouse.move(bounds.x + bounds.width * .25, bounds.y + bounds.height * .8);
+  await expect.poll(async () => Number(await canvas.getAttribute('data-paddle-x'))).toBeLessThan(initialX);
+  await page.mouse.click(bounds.x + bounds.width * .25, bounds.y + bounds.height * .8);
+  await expect(canvas).toHaveAttribute('data-ball-state', 'launched');
+  expect(browserErrors).toEqual([]);
 });
 
 test('pause stops timers and supports resume, R, restart and exit', async ({
@@ -158,6 +220,7 @@ test('pause stops timers and supports resume, R, restart and exit', async ({
 
   await page.getByRole('button', { name: 'Играть' }).click();
   await page.getByRole('button', { name: /Прохождение/ }).click();
+  await page.getByRole('button', { name: 'Начать уровень' }).click();
   await expect(canvas).toHaveAttribute('data-ball-state', 'ready');
   await expect(canvas).toHaveAttribute('data-paused', 'false');
 });
@@ -219,8 +282,9 @@ test('menu delays Phaser creation and persists settings', async ({ page }) => {
 
   await expect(page.getByLabel('Главное меню')).toBeVisible();
   await expect(page.locator('canvas')).toHaveCount(0);
+  await expect(page.getByLabel('Главное меню').locator('select')).toHaveCount(0);
   await expect(page.getByText('Лучший результат')).toBeVisible();
-  await expect(page.getByText('Освободи время для настоящей работы')).toBeVisible();
+  await expect(page.getByText('Освобождайте фокус-время — по одной встрече за раз.')).toBeVisible();
   await expect(page.getByText('Разбей все встречи и сохрани кофе до пятницы.')).toBeVisible();
   const menuButtons = page.getByLabel('Главное меню').locator('button');
   const boxes = await menuButtons.evaluateAll((buttons) => buttons.map((button) => button.getBoundingClientRect()).map(({ x, y, width }) => ({ x, y, width })));
@@ -258,6 +322,7 @@ test('menu delays Phaser creation and persists settings', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Играть' }).click();
   await page.getByRole('button', { name: /Прохождение/ }).click();
+  await page.getByRole('button', { name: 'Начать уровень' }).click();
   await expect(page.locator('canvas')).toHaveCount(1);
   await expect(page.locator('canvas')).toHaveAttribute('data-theme', 'light');
   await page.getByRole('button', { name: 'Пауза' }).click();
@@ -269,6 +334,7 @@ test('menu delays Phaser creation and persists settings', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Играть' }).click();
   await page.getByRole('button', { name: /Прохождение/ }).click();
+  await page.getByRole('button', { name: 'Начать уровень' }).click();
   await expect(page.locator('canvas')).toHaveCount(1);
 });
 

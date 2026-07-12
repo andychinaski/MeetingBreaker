@@ -9,18 +9,23 @@ import {
 } from '../systems/calendarLayout';
 import type { GameTheme } from '../config/theme';
 import { getGameTheme } from '../config/theme';
+import { DEFAULT_SETTINGS, SETTINGS_REGISTRY_KEY, type UserSettings } from '../../services/storageService';
+import { workDayLabels } from '../../services/i18n';
 
 export class CalendarGrid extends Phaser.GameObjects.Container {
   private readonly graphics: Phaser.GameObjects.Graphics;
   private readonly labels: Phaser.GameObjects.Text[] = [];
   private readonly layout: CalendarLayout;
   private theme: GameTheme;
+  private readonly dayLabels: readonly string[];
   constructor(scene: Phaser.Scene, layout: CalendarLayout) {
     super(scene, 0, 0);
     scene.add.existing(this);
     this.setDepth(0);
 
     this.layout = layout;
+    const language = ((scene.game.registry.get(SETTINGS_REGISTRY_KEY) as UserSettings | undefined) ?? DEFAULT_SETTINGS).language;
+    this.dayLabels = workDayLabels[language];
     this.theme = getGameTheme('dark');
     this.graphics = scene.add.graphics();
     this.add(this.graphics);
@@ -81,7 +86,7 @@ export class CalendarGrid extends Phaser.GameObjects.Container {
         index * (columnWidth + layout.columnGap) +
         columnWidth / 2;
       const label = this.scene.add
-        .text(x, layout.y - 27, WORK_DAY_LABELS[index] ?? '', {
+        .text(x, layout.y - 27, this.dayLabels[index] ?? '', {
           color: this.theme.label,
           fontFamily: 'Arial, sans-serif',
           fontSize: '14px',

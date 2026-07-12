@@ -1,4 +1,5 @@
 import type { LevelResult, ScoreSnapshot } from '../types/game';
+import type { TutorialSnapshot } from '../systems/TutorialController';
 
 export const GAME_EVENTS = {
   GAME_STARTED: 'GAME_STARTED',
@@ -12,14 +13,20 @@ export const GAME_EVENTS = {
   GAME_OVER: 'GAME_OVER',
   MEETING_BEHAVIOR_ACTION: 'MEETING_BEHAVIOR_ACTION',
   THEME_CHANGED: 'THEME_CHANGED',
+  WAVE_CHANGED: 'WAVE_CHANGED',
+  TUTORIAL_CHANGED: 'TUTORIAL_CHANGED',
 } as const;
 
 export const GAME_COMMANDS = {
   RESTART_LEVEL: 'RESTART_LEVEL',
   TOGGLE_PAUSE: 'TOGGLE_PAUSE',
+  TUTORIAL_CONTINUE: 'TUTORIAL_CONTINUE',
+  TUTORIAL_SKIP: 'TUTORIAL_SKIP',
 } as const;
 
 export const GAME_STATE_REGISTRY_KEY = 'meeting-breaker-game-state';
+export const TUTORIAL_STATE_REGISTRY_KEY = 'meeting-breaker-tutorial-state';
+export type TutorialChangedPayload = TutorialSnapshot;
 
 export interface GameStartedPayload {
   levelId: string;
@@ -28,7 +35,10 @@ export interface GameStartedPayload {
   coffeeCups: number;
   initialCoffeeCups: number;
   coffeeEnabled?: boolean;
+  wave: number;
 }
+
+export interface WaveChangedPayload { wave: number }
 
 export type ScoreChangedPayload = ScoreSnapshot;
 

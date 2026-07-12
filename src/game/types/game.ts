@@ -20,6 +20,7 @@ export interface GameState extends ScoreSnapshot {
   activePowerUps: string[];
   coffeeEnabled: boolean;
   status: GameStatus;
+  wave: number;
 }
 
 export interface LevelResult extends ScoreSnapshot {

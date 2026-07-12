@@ -1,6 +1,8 @@
 import type { LevelResult } from '../game/types/game';
 import { formatFreedTime } from '../game/systems/ScoreSystem';
 import styles from './GameHud.module.css';
+import type { Language } from '../services/storageService';
+import { t } from '../services/i18n';
 
 export type GameOutcome = 'victory' | 'defeat';
 
@@ -10,6 +12,7 @@ interface GameResultOverlayProps {
   onRestart: () => void;
   onExit: () => void;
   onNextLevel?: () => void;
+  language?: Language;
 }
 
 export function GameResultOverlay({
@@ -18,6 +21,7 @@ export function GameResultOverlay({
   onRestart,
   onExit,
   onNextLevel = onExit,
+  language = 'ru',
 }: GameResultOverlayProps) {
   const victory = outcome === 'victory';
 
@@ -25,31 +29,31 @@ export function GameResultOverlay({
     <div className={styles.resultBackdrop} role="dialog" aria-modal="true">
       <section className={styles.resultCard}>
         <p className={styles.resultEyebrow}>
-          {victory ? 'Неделя под контролем' : 'Рабочая неделя завершена'}
+          {t(language, victory ? 'result.victoryEyebrow' : 'result.defeatEyebrow')}
         </p>
-        <h2>{victory ? 'Рабочая неделя спасена' : 'Кофе закончился'}</h2>
-        {!victory && <p className={styles.defeatMessage}>Встречи победили.</p>}
+        <h2>{t(language, victory ? 'result.victoryTitle' : 'result.defeatTitle')}</h2>
+        {!victory && <p className={styles.defeatMessage}>{t(language, 'result.defeatMessage')}</p>}
 
         {victory && (
           <dl className={styles.resultStats}>
             <div>
-              <dt>Очки</dt>
-              <dd>{result.score.toLocaleString('ru-RU')}</dd>
+              <dt>{t(language, 'game.score')}</dt>
+              <dd>{result.score.toLocaleString(language === 'ru' ? 'ru-RU' : 'en-US')}</dd>
             </div>
             <div>
-              <dt>Встреч уничтожено</dt>
+              <dt>{t(language, 'result.meetings')}</dt>
               <dd>{result.destroyedMeetings}</dd>
             </div>
             <div>
-              <dt>Свободное время</dt>
-              <dd>{formatFreedTime(result.freedMinutes)}</dd>
+              <dt>{t(language, 'result.freed')}</dt>
+              <dd>{formatFreedTime(result.freedMinutes, language)}</dd>
             </div>
             <div>
-              <dt>Максимальное комбо</dt>
+              <dt>{t(language, 'result.maxCombo')}</dt>
               <dd>×{result.maxCombo}</dd>
             </div>
             <div>
-              <dt>Потрачено кофе</dt>
+              <dt>{t(language, 'result.coffeeSpent')}</dt>
               <dd>{result.coffeeSpent}</dd>
             </div>
           </dl>
@@ -59,10 +63,10 @@ export function GameResultOverlay({
 
         <div className={styles.resultActions}>
           <button type="button" className={victory ? styles.secondaryButton : styles.primaryButton} onClick={onRestart}>
-            {victory ? 'Сыграть еще' : 'Заварить заново'}
+            {t(language, victory ? 'result.playAgain' : 'result.retry')}
           </button>
-          {victory ? <button type="button" className={styles.homeButton} aria-label="В главное меню" title="В главное меню" onClick={onExit}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10Z" /></svg></button> : null}
-          {victory ? <button type="button" className={styles.primaryButton} onClick={onNextLevel}>Идем дальше</button> : <button type="button" className={styles.secondaryButton} onClick={onExit}>Закончить рабочую неделю</button>}
+          {victory ? <button type="button" className={styles.homeButton} aria-label={t(language, 'result.home')} title={t(language, 'result.home')} onClick={onExit}><svg viewBox="0 0 24 24" aria-hidden="true"><path d="m3 10 9-7 9 7v10a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1V10Z" /></svg></button> : null}
+          {victory ? <button type="button" className={styles.primaryButton} onClick={onNextLevel}>{t(language, 'result.next')}</button> : <button type="button" className={styles.secondaryButton} onClick={onExit}>{t(language, 'pause.exit')}</button>}
         </div>
       </section>
     </div>

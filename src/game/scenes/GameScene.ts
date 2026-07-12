@@ -18,6 +18,7 @@ import {
   GAME_COMMANDS,
   GAME_EVENTS,
   GAME_STATE_REGISTRY_KEY,
+  TUTORIAL_STATE_REGISTRY_KEY,
   type CoffeeChangedPayload,
   type CoffeeConsumedPayload,
   type GameOverPayload,
@@ -59,31 +60,27 @@ import {
   DEFAULT_SETTINGS,
   SETTINGS_REGISTRY_KEY,
   type UserSettings,
+  type Language,
+  type ControlScheme,
 } from '../../services/storageService';
 import { GAME_MODES, LEVEL_REGISTRY_KEY, MODE_REGISTRY_KEY, TUTORIAL_REGISTRY_KEY, type GameModeConfig } from '../types/mode';
-import type { MeetingBlockConfig, WorkDay } from '../types/meeting';
+import type { MeetingBlockConfig, MeetingType, WorkDay } from '../types/meeting';
 import type { LevelConfig } from '../types/level';
 import { TutorialController, type TutorialEvent } from '../systems/TutorialController';
 import { GAME_THEME_REGISTRY_KEY, getGameTheme, type GameTheme } from '../config/theme';
-
-const COFFEE_LOSS_MESSAGES: string[] = [
-  'Задача потеряна. Пора за кофе.',
-  'Без кофе это уже не починить.',
-  'Ещё одна чашка — и продолжаем.',
-  'Фокус закончился. Кофе ещё есть.',
-  'Небольшой перерыв у кофемашины.',
-  'Продолжаем на кофеине.',
-];
+import {
+  CONTROL_SCHEME_REGISTRY_KEY,
+  createInputController,
+} from '../input/InputController';
+import { InputControllerManager } from '../input/InputControllerManager';
+import { coffeeLossMessages, t, translateLevelTitle, translateMeetingTitle } from '../../services/i18n';
 
 export class GameScene extends Phaser.Scene {
   private paddle!: Paddle;
   private ball!: Ball;
   private readonly activeBalls: Ball[] = [];
   private readonly powerUps: PowerUp[] = [];
-  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
-  private leftKey!: Phaser.Input.Keyboard.Key;
-  private rightKey!: Phaser.Input.Keyboard.Key;
-  private launchKey!: Phaser.Input.Keyboard.Key;
+  private readonly inputController = new InputControllerManager();
   private ballLaunched = false;
   private resettingBall = false;
   private launchDirection: HorizontalDirection = 1;
@@ -102,12 +99,13 @@ export class GameScene extends Phaser.Scene {
   private endlessGenerator?: EndlessMeetingGenerator;
   private waveTimer?: Phaser.Time.TimerEvent;
   private createdMeetingCount = 0;
+  private wave = 1;
   private tutorialController?: TutorialController;
-  private tutorialText?: Phaser.GameObjects.Text;
   private sessionMeetings: MeetingBlockConfig[] = [];
   private calendarGrid?: CalendarGrid;
   private boundsGraphics?: Phaser.GameObjects.Graphics;
   private theme!: GameTheme;
+  private language: Language = 'ru';
 
   constructor() {
     super('GameScene');
@@ -126,6 +124,7 @@ export class GameScene extends Phaser.Scene {
 
     this.setCanvasState('ready');
     this.publishGameStarted();
+    if (this.tutorialController) this.publishTutorialStep();
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.cleanupScene, this);
   }
 
@@ -134,7 +133,7 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    this.updateKeyboardMovement(delta);
+    this.inputController.update(delta);
     this.meetingBlocks.forEach((block) => block.updateBehavior(delta));
     if (this.mode.endless) this.scheduleEndlessWave();
 
@@ -189,12 +188,13 @@ export class GameScene extends Phaser.Scene {
     const modeId = this.game.registry.get(MODE_REGISTRY_KEY) as GameModeConfig['id'] | undefined;
     this.mode = GAME_MODES[modeId ?? 'campaign'];
     const tutorialEnabled = Boolean(this.game.registry.get(TUTORIAL_REGISTRY_KEY));
+    this.language = ((this.game.registry.get(SETTINGS_REGISTRY_KEY) as UserSettings | undefined) ?? DEFAULT_SETTINGS).language;
     this.tutorialController = tutorialEnabled ? new TutorialController() : undefined;
     const levelId = this.game.registry.get(LEVEL_REGISTRY_KEY) as string | undefined;
     this.level = tutorialEnabled ? TUTORIAL_LEVEL : LEVELS.find((level) => level.id === levelId) ?? DEFAULT_LEVEL;
     this.endlessGenerator = this.mode.endless ? new EndlessMeetingGenerator(this.mode) : undefined;
-    const generatedMeetings = this.endlessGenerator?.createWave([]).meetings.map((config) => ({ ...config, title: getMeetingType(config.typeId).title }));
-    this.sessionMeetings = generatedMeetings ?? this.level.meetings.map((meeting) => ({ ...meeting }));
+    const generatedMeetings = this.endlessGenerator?.createWave([]).meetings;
+    this.sessionMeetings = (generatedMeetings ?? this.level.meetings).map((meeting) => ({ ...meeting, title: translateMeetingTitle(this.language, meeting.typeId, getMeetingType(meeting.typeId).title) }));
     this.scoreSystem = new ScoreSystem(this.mode.scoreMultiplier);
     this.coffeeSystem = new CoffeeSystem(this.mode.coffeeEnabled ? (this.mode.initialCoffeeCups ?? this.level.initialCoffeeCups) : 1);
     this.levelProgress = new LevelProgress(
@@ -209,11 +209,8 @@ export class GameScene extends Phaser.Scene {
     );
     this.powerUps.length = 0;
     this.createdMeetingCount = 0;
+    this.wave = 1;
     this.gameStatus = 'playing';
-    if (this.tutorialController) {
-      this.tutorialText = this.add.text(GAME_WIDTH / 2, 82, '', { color: '#f8fafc', backgroundColor: '#0f172add', padding: { x: 16, y: 10 }, fontSize: '17px', fontStyle: 'bold', wordWrap: { width: 720 } }).setOrigin(0.5).setDepth(50);
-      this.publishTutorialStep();
-    }
   }
 
   private createCalendar(): void {
@@ -221,7 +218,7 @@ export class GameScene extends Phaser.Scene {
     this.calendarGrid = new CalendarGrid(this, DEFAULT_CALENDAR_LAYOUT);
 
     for (const meetingConfig of this.sessionMeetings) {
-      const meetingType = getMeetingType(meetingConfig.typeId);
+      const meetingType = this.localizedMeetingType(meetingConfig.typeId);
       const rectangle = calculateMeetingRect(
         meetingConfig,
         DEFAULT_CALENDAR_LAYOUT,
@@ -238,28 +235,26 @@ export class GameScene extends Phaser.Scene {
     this.game.canvas.dataset.gameMode = this.mode.id;
     this.game.canvas.dataset.ballAcceleration = String(this.mode.ballAccelerationEnabled);
     this.game.canvas.dataset.coffeeEnabled = String(this.mode.coffeeEnabled);
+    this.game.canvas.dataset.locale = this.language;
+  }
+
+  private localizedMeetingType(typeId: string): MeetingType {
+    const type = getMeetingType(typeId);
+    return {
+      ...type,
+      title: translateMeetingTitle(this.language, type.id, type.title),
+      shortTitle: translateMeetingTitle(this.language, type.id, type.shortTitle, true),
+    };
   }
 
   private configureInput(): void {
-    const keyboard = this.input.keyboard;
-
-    if (!keyboard) {
-      throw new Error('Keyboard input is not available');
-    }
-
-    this.cursors = keyboard.createCursorKeys();
-    this.leftKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
-    this.rightKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
-    this.launchKey = keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.SPACE);
-
-    this.game.canvas.addEventListener(
-      'pointermove',
-      this.handleCanvasPointerMove,
-    );
-    this.game.canvas.addEventListener(
-      'pointerdown',
-      this.handleCanvasPointerDown,
-    );
+    const scheme = (this.game.registry.get(CONTROL_SCHEME_REGISTRY_KEY) as ControlScheme | undefined) ?? 'keyboard';
+    this.inputController.use(createInputController(scheme, this, {
+      moveBy: (distance) => this.movePaddleTo(this.paddle.x + distance),
+      moveTo: (x) => this.movePaddleTo(x),
+      launch: () => this.launchBall(),
+    }, PADDLE_SPEED));
+    this.game.canvas.dataset.controlScheme = scheme;
     window.addEventListener('keydown', this.handleWindowKeyDown);
   }
 
@@ -299,7 +294,7 @@ export class GameScene extends Phaser.Scene {
       const configs = wave.meetings.slice(0, 100 - this.createdMeetingCount);
       this.levelProgress.addRequired(configs.map((config) => config.id));
       for (const config of configs) {
-        const meetingType = getMeetingType(config.typeId);
+        const meetingType = this.localizedMeetingType(config.typeId);
         config.title = meetingType.title;
         const block = new MeetingBlock(this, config, meetingType, calculateMeetingRect(config, DEFAULT_CALENDAR_LAYOUT));
         this.meetingBlocks.push(block);
@@ -307,6 +302,8 @@ export class GameScene extends Phaser.Scene {
         this.createdMeetingCount += 1;
       }
       this.game.canvas.dataset.wave = wave.wave.toString();
+      this.wave = wave.wave;
+      this.game.events.emit(GAME_EVENTS.WAVE_CHANGED, { wave: this.wave });
       this.game.canvas.dataset.waveWarning = 'false';
       this.game.canvas.dataset.meetingCount = this.meetingBlocks.filter((block) => !block.destroyed).length.toString();
     });
@@ -330,6 +327,8 @@ export class GameScene extends Phaser.Scene {
     );
     this.game.events.on(GAME_EVENTS.MEETING_BEHAVIOR_ACTION, this.handleBehaviorAction, this);
     this.game.events.on(GAME_EVENTS.THEME_CHANGED, this.applyTheme, this);
+    this.game.events.on(GAME_COMMANDS.TUTORIAL_CONTINUE, this.handleTutorialContinue, this);
+    this.game.events.on(GAME_COMMANDS.TUTORIAL_SKIP, this.handleTutorialSkip, this);
   }
 
   private readonly handleBehaviorAction = (payload: MeetingBehaviorActionPayload): void => {
@@ -355,7 +354,7 @@ export class GameScene extends Phaser.Scene {
     const occupied = this.meetingBlocks.filter((block) => !block.destroyed).map((block) => `${block.config.day}-${block.config.startMinutes}`);
     const free: Array<{ day: WorkDay; startMinutes: number }> = [];
     for (const day of days) for (let startMinutes = 540; startMinutes <= 990; startMinutes += 30) if (!occupied.includes(`${day}-${startMinutes}`)) free.push({ day, startMinutes });
-    const meetingType = getMeetingType(typeId);
+    const meetingType = this.localizedMeetingType(typeId);
     free.slice(0, Math.min(count, 3)).forEach((slot, index) => {
       const config: MeetingBlockConfig = { id: `${typeId}-${this.time.now}-${index}`, typeId, title: generation > 0 ? `↻ ${meetingType.title}` : meetingType.title, ...slot, durationMinutes: 30, required: true, generation, scoreMultiplier };
       const block = new MeetingBlock(this, config, meetingType, calculateMeetingRect(config, DEFAULT_CALENDAR_LAYOUT));
@@ -364,34 +363,6 @@ export class GameScene extends Phaser.Scene {
       this.activeBalls.forEach((ball) => this.configureMeetingCollision(ball, block));
     });
   }
-
-  private updateKeyboardMovement(delta: number): void {
-    const movingLeft = this.leftKey.isDown || this.cursors.left.isDown;
-    const movingRight = this.rightKey.isDown || this.cursors.right.isDown;
-    const direction = Number(movingRight) - Number(movingLeft);
-
-    if (direction !== 0) {
-      this.movePaddleTo(
-        this.paddle.x + direction * PADDLE_SPEED * (delta / 1000),
-      );
-    }
-
-    if (Phaser.Input.Keyboard.JustDown(this.launchKey)) {
-      this.launchBall();
-    }
-  }
-
-  private readonly handleCanvasPointerMove = (event: PointerEvent): void => {
-    const bounds = this.game.canvas.getBoundingClientRect();
-    const worldX = ((event.clientX - bounds.left) / bounds.width) * GAME_WIDTH;
-    this.movePaddleTo(worldX);
-  };
-
-  private readonly handleCanvasPointerDown = (event: PointerEvent): void => {
-    if (event.button === 0) {
-      this.launchBall();
-    }
-  };
 
   private readonly handleWindowKeyDown = (event: KeyboardEvent): void => {
     if (event.repeat) {
@@ -408,6 +379,7 @@ export class GameScene extends Phaser.Scene {
   };
 
   private movePaddleTo(x: number): void {
+    if (this.tutorialController && !this.tutorialController.allows('move') && !this.tutorialController.allows('play')) return;
     const halfWidth = this.paddle.displayWidth / 2;
     this.paddle.moveTo(
       x,
@@ -419,6 +391,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private launchBall(): void {
+    if (this.tutorialController && !this.tutorialController.allows('launch') && !this.tutorialController.allows('play')) return;
     if (
       this.gameStatus !== 'playing' ||
       this.ballLaunched ||
@@ -534,7 +507,7 @@ export class GameScene extends Phaser.Scene {
     };
     const consumedPayload: CoffeeConsumedPayload = {
       ...coffeePayload,
-      message: Phaser.Utils.Array.GetRandom(COFFEE_LOSS_MESSAGES),
+      message: Phaser.Utils.Array.GetRandom([...coffeeLossMessages[this.language]]),
     };
     this.updateRegistryState();
     this.game.events.emit(GAME_EVENTS.COFFEE_CONSUMED, consumedPayload);
@@ -572,9 +545,6 @@ export class GameScene extends Phaser.Scene {
 
     this.publishScore(this.scoreSystem.registerMeetingDestroyed(payload));
     this.advanceTutorial('meeting-destroyed');
-    if (getMeetingType(payload.typeId).maxHp > 1) this.advanceTutorial('durable-meeting-destroyed');
-    this.advanceTutorial('score-changed');
-    if (this.scoreSystem.snapshot.combo > 1) this.advanceTutorial('combo-changed');
     if (Math.random() < payload.dropChance * this.mode.bonusDropMultiplier) {
       this.spawnPowerUp(payload.x, payload.y);
     }
@@ -588,7 +558,10 @@ export class GameScene extends Phaser.Scene {
     this.game.canvas.dataset.requiredMeetings =
       this.levelProgress.remainingRequired.toString();
 
-    if (completedNow && !this.mode.endless && !this.tutorialController) {
+    if (completedNow && this.tutorialController) {
+      this.advanceTutorial('calendar-cleared');
+      if (this.tutorialController.isCompleted) this.finishWithVictory();
+    } else if (completedNow && !this.mode.endless) {
       this.finishWithVictory();
     } else if (completedNow) {
       this.scheduleEndlessWave();
@@ -601,6 +574,7 @@ export class GameScene extends Phaser.Scene {
   };
 
   private readonly handleTogglePause = (): void => {
+    if (this.tutorialController && this.gameStatus === 'playing' && !this.tutorialController.allows('pause')) return;
     if (this.gameStatus === 'playing') {
       this.gameStatus = 'paused';
       this.updateRegistryState();
@@ -608,10 +582,6 @@ export class GameScene extends Phaser.Scene {
       const payload: PauseChangedPayload = { paused: true };
       this.game.events.emit(GAME_EVENTS.PAUSE_CHANGED, payload);
       this.advanceTutorial('paused');
-      if (this.tutorialController?.current?.waitForEvent === 'level-completed') {
-        this.finishWithVictory();
-        return;
-      }
       this.scene.pause();
       return;
     }
@@ -652,7 +622,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.publishActivePowerUps(type);
-    this.advanceTutorial(type === 'espresso-shot' ? 'espresso-collected' : type === 'decline' ? 'decline-collected' : 'async-collected');
+    if (type === 'espresso-shot') this.advanceTutorial('espresso-collected');
   }
 
   private addAsyncBall(): void {
@@ -716,7 +686,7 @@ export class GameScene extends Phaser.Scene {
     this.updateRegistryState();
     this.game.events.emit(GAME_EVENTS.POWER_UP_ACTIVATED, {
       powerUpId: type ?? 'none',
-      title: type ? POWER_UP_DEFINITIONS[type].title : 'Нет',
+      title: type ? POWER_UP_DEFINITIONS[type].title : t(this.language, 'game.none'),
       activePowerUps: activeTitles,
     });
   }
@@ -724,7 +694,6 @@ export class GameScene extends Phaser.Scene {
   private finishWithVictory(): void {
     this.gameStatus = 'won';
     this.soundSystem.play('victory');
-    this.advanceTutorial('level-completed');
     this.stopGameplay('level-completed');
     const payload: LevelCompletedPayload = {
       result: this.scoreSystem.createLevelResult(
@@ -762,11 +731,12 @@ export class GameScene extends Phaser.Scene {
   private publishGameStarted(): void {
     const payload: GameStartedPayload = {
       levelId: this.level.id,
-      levelTitle: this.mode.endless ? `${this.mode.id === 'hard' ? 'Hard' : 'Relax'} Endless` : this.level.title,
+      levelTitle: this.mode.endless ? `${this.mode.id === 'hard' ? 'Hard' : 'Relax'} Endless` : translateLevelTitle(this.language, this.level.id, this.level.title),
       score: this.scoreSystem.snapshot,
       coffeeCups: this.coffeeSystem.coffeeCups,
       initialCoffeeCups: this.coffeeSystem.initialCoffeeCups,
       coffeeEnabled: this.mode.coffeeEnabled,
+      wave: this.wave,
     };
     this.updateRegistryState();
     this.game.events.emit(GAME_EVENTS.GAME_STARTED, payload);
@@ -781,18 +751,52 @@ export class GameScene extends Phaser.Scene {
     if (this.tutorialController?.notify(event)) this.publishTutorialStep();
   }
 
+  private readonly handleTutorialContinue = (): void => {
+    const controller = this.tutorialController;
+    if (!controller?.continue()) return;
+    this.physics.resume();
+    if (this.gameStatus === 'paused') {
+      this.scene.resume();
+      this.gameStatus = 'playing';
+      this.game.events.emit(GAME_EVENTS.PAUSE_CHANGED, { paused: false });
+    }
+    const step = controller.current;
+    this.publishTutorialStep();
+    if (controller.snapshot.phase !== 'action') return;
+    if (step?.setup === 'lose-ball') this.time.delayedCall(250, () => this.handleAllBallsLost());
+    if (step?.setup === 'spawn-espresso') this.spawnTutorialEspresso();
+    if (step?.id === 'independent' && this.levelProgress.remainingRequired === 0) {
+      this.advanceTutorial('calendar-cleared');
+      this.finishWithVictory();
+    }
+  };
+
+  private readonly handleTutorialSkip = (): void => {
+    if (!this.tutorialController) return;
+    this.tutorialController.skip();
+    this.physics.resume();
+    if (this.gameStatus === 'paused') {
+      this.scene.resume();
+      this.gameStatus = 'playing';
+      this.game.events.emit(GAME_EVENTS.PAUSE_CHANGED, { paused: false });
+    }
+    this.publishTutorialStep();
+  };
+
+  private spawnTutorialEspresso(): void {
+    const powerUp = new PowerUp(this, this.paddle.x, this.paddle.y - 90, 'espresso-shot');
+    this.powerUps.push(powerUp);
+    this.physics.add.overlap(powerUp, this.paddle, () => this.activatePowerUp(powerUp));
+  }
+
   private publishTutorialStep(): void {
-    const step = this.tutorialController?.current;
+    const snapshot = this.tutorialController?.snapshot;
+    const step = snapshot?.step;
     this.game.canvas.dataset.tutorialStep = step?.id ?? 'completed';
-    if (this.tutorialText) {
-      this.tutorialText.setText(step?.message ?? '').setVisible(Boolean(step));
-    }
-    if (step && ['espresso', 'decline', 'async'].includes(step.id) && this.paddle) {
-      const type = step.id === 'espresso' ? 'espresso-shot' : step.id === 'decline' ? 'decline' : 'async-mode';
-      const powerUp = new PowerUp(this, this.paddle.x, this.paddle.y - 55, type);
-      this.powerUps.push(powerUp);
-      this.physics.add.overlap(powerUp, this.paddle, () => this.activatePowerUp(powerUp));
-    }
+    if (!snapshot) return;
+    this.game.registry.set(TUTORIAL_STATE_REGISTRY_KEY, snapshot);
+    this.game.events.emit(GAME_EVENTS.TUTORIAL_CHANGED, snapshot);
+    if (snapshot.phase === 'explanation') this.physics.pause();
   }
 
   private updateRegistryState(): void {
@@ -805,6 +809,7 @@ export class GameScene extends Phaser.Scene {
         .map((type) => POWER_UP_DEFINITIONS[type].title),
       coffeeEnabled: this.mode.coffeeEnabled,
       status: this.gameStatus,
+      wave: this.wave,
     };
     this.game.registry.set(GAME_STATE_REGISTRY_KEY, state);
     this.game.canvas.dataset.score = state.score.toString();
@@ -828,7 +833,6 @@ export class GameScene extends Phaser.Scene {
     this.calendarGrid?.setTheme(this.theme);
     this.meetingBlocks.forEach((block) => block.setTheme(this.theme));
     this.drawBounds();
-    if (this.tutorialText) this.tutorialText.setStyle({ color: this.theme.tutorialText, backgroundColor: this.theme.tutorialBackground });
     this.game.canvas.dataset.theme = themeName;
   };
 
@@ -854,14 +858,7 @@ export class GameScene extends Phaser.Scene {
     this.waveTimer?.remove(false);
     this.espressoTimer?.remove(false);
     this.soundSystem.destroy();
-    this.game.canvas.removeEventListener(
-      'pointermove',
-      this.handleCanvasPointerMove,
-    );
-    this.game.canvas.removeEventListener(
-      'pointerdown',
-      this.handleCanvasPointerDown,
-    );
+    this.inputController.destroy();
     window.removeEventListener('keydown', this.handleWindowKeyDown);
     this.game.events.off(
       GAME_EVENTS.MEETING_DESTROYED,
@@ -880,6 +877,8 @@ export class GameScene extends Phaser.Scene {
     );
     this.game.events.off(GAME_EVENTS.MEETING_BEHAVIOR_ACTION, this.handleBehaviorAction, this);
     this.game.events.off(GAME_EVENTS.THEME_CHANGED, this.applyTheme, this);
+    this.game.events.off(GAME_COMMANDS.TUTORIAL_CONTINUE, this.handleTutorialContinue, this);
+    this.game.events.off(GAME_COMMANDS.TUTORIAL_SKIP, this.handleTutorialSkip, this);
     delete this.game.canvas.dataset.ballState;
     delete this.game.canvas.dataset.activeBalls;
     delete this.game.canvas.dataset.calendarReady;
@@ -901,5 +900,7 @@ export class GameScene extends Phaser.Scene {
     delete this.game.canvas.dataset.waveWarning;
     delete this.game.canvas.dataset.tutorialStep;
     delete this.game.canvas.dataset.theme;
+    delete this.game.canvas.dataset.controlScheme;
+    delete this.game.canvas.dataset.locale;
   }
 }

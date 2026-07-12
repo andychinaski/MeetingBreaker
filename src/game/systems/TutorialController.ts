@@ -1,21 +1,69 @@
-export type TutorialEvent = 'paddle-moved' | 'ball-launched' | 'meeting-destroyed' | 'durable-meeting-destroyed' | 'score-changed' | 'combo-changed' | 'ball-lost' | 'espresso-collected' | 'decline-collected' | 'async-collected' | 'paused' | 'level-completed';
-export interface TutorialStep { id: string; message: string; waitForEvent: TutorialEvent; highlightTarget?: string; allowSkip?: boolean }
+import type { TranslationKey } from '../../services/i18n';
+
+export type TutorialEvent = 'paddle-moved' | 'ball-launched' | 'meeting-destroyed' | 'ball-lost' | 'espresso-collected' | 'paused' | 'calendar-cleared';
+export type TutorialAction = 'move' | 'launch' | 'play' | 'pause';
+export type TutorialTarget = 'paddle' | 'ball' | 'meeting' | 'score' | 'coffee' | 'bonus' | 'pause' | 'calendar';
+export type TutorialPhase = 'explanation' | 'action' | 'completed';
+
+export interface TutorialStep {
+  id: string;
+  messageKey: TranslationKey;
+  actionMessageKey?: TranslationKey;
+  spotlightTarget?: TutorialTarget;
+  allowedActions: TutorialAction[];
+  completionEvent?: TutorialEvent;
+  setup?: 'lose-ball' | 'spawn-espresso';
+}
+
+export interface TutorialSnapshot {
+  step?: TutorialStep;
+  phase: TutorialPhase;
+  index: number;
+}
+
 export const TUTORIAL_STEPS: readonly TutorialStep[] = [
-  { id: 'move', message: 'Перемести платформу мышью или клавишами A / D.', waitForEvent: 'paddle-moved', highlightTarget: 'paddle', allowSkip: true },
-  { id: 'launch', message: 'Запусти шарик пробелом или кликом.', waitForEvent: 'ball-launched', highlightTarget: 'ball' },
-  { id: 'meeting', message: 'Разбей обычную встречу.', waitForEvent: 'meeting-destroyed' },
-  { id: 'durable', message: 'Встречам с несколькими HP нужно несколько ударов.', waitForEvent: 'durable-meeting-destroyed' },
-  { id: 'coffee', message: 'Потерянный шарик расходует чашку кофе.', waitForEvent: 'ball-lost', highlightTarget: 'coffee' },
-  { id: 'espresso', message: 'Espresso Shot расширяет платформу и замедляет шарик.', waitForEvent: 'espresso-collected' },
-  { id: 'pause', message: 'Escape ставит рабочую неделю на паузу.', waitForEvent: 'paused' },
-  { id: 'complete', message: 'Заверши учебную рабочую неделю.', waitForEvent: 'level-completed' },
+  { id: 'paddle', messageKey: 'tutorial.paddle', actionMessageKey: 'tutorial.moveKeyboard', spotlightTarget: 'paddle', allowedActions: ['move'], completionEvent: 'paddle-moved' },
+  { id: 'ball', messageKey: 'tutorial.ball', actionMessageKey: 'tutorial.launchKeyboard', spotlightTarget: 'ball', allowedActions: ['launch'], completionEvent: 'ball-launched' },
+  { id: 'meeting', messageKey: 'tutorial.meeting', spotlightTarget: 'meeting', allowedActions: ['move', 'play'], completionEvent: 'meeting-destroyed' },
+  { id: 'score', messageKey: 'tutorial.score', spotlightTarget: 'score', allowedActions: [] },
+  { id: 'coffee', messageKey: 'tutorial.coffee', spotlightTarget: 'coffee', allowedActions: [], completionEvent: 'ball-lost', setup: 'lose-ball' },
+  { id: 'bonus', messageKey: 'tutorial.bonus', spotlightTarget: 'bonus', allowedActions: ['move', 'play'], completionEvent: 'espresso-collected', setup: 'spawn-espresso' },
+  { id: 'pause', messageKey: 'tutorial.pause', spotlightTarget: 'pause', allowedActions: ['pause'], completionEvent: 'paused' },
+  { id: 'independent', messageKey: 'tutorial.independent', spotlightTarget: 'calendar', allowedActions: ['move', 'launch', 'play', 'pause'], completionEvent: 'calendar-cleared' },
 ];
+
 export class TutorialController {
   private index = 0;
-  private completed = false;
+  private phase: TutorialPhase = 'explanation';
+
   constructor(private readonly steps: readonly TutorialStep[] = TUTORIAL_STEPS) {}
-  get current(): TutorialStep | undefined { return this.completed ? undefined : this.steps[this.index]; }
-  notify(event: TutorialEvent): boolean { if (!this.current || this.current.waitForEvent !== event) return false; this.index += 1; this.completed = this.index >= this.steps.length; return true; }
-  skip(): void { this.completed = true; }
-  get isCompleted(): boolean { return this.completed; }
+
+  get current(): TutorialStep | undefined { return this.phase === 'completed' ? undefined : this.steps[this.index]; }
+  get snapshot(): TutorialSnapshot { return { step: this.current, phase: this.phase, index: this.index }; }
+  get isCompleted(): boolean { return this.phase === 'completed'; }
+
+  continue(): boolean {
+    const step = this.current;
+    if (!step || this.phase !== 'explanation') return false;
+    if (step.completionEvent) this.phase = 'action';
+    else this.advance();
+    return true;
+  }
+
+  allows(action: TutorialAction): boolean {
+    return this.phase === 'action' && Boolean(this.current?.allowedActions.includes(action));
+  }
+
+  notify(event: TutorialEvent): boolean {
+    if (this.phase !== 'action' || this.current?.completionEvent !== event) return false;
+    this.advance();
+    return true;
+  }
+
+  skip(): void { this.phase = 'completed'; }
+
+  private advance(): void {
+    this.index += 1;
+    this.phase = this.index >= this.steps.length ? 'completed' : 'explanation';
+  }
 }

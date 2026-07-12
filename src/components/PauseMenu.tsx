@@ -1,32 +1,35 @@
 import styles from './GameHud.module.css';
+import type { Language } from '../services/storageService';
+import { t } from '../services/i18n';
 
 interface PauseMenuProps {
   onResume: () => void;
   onRestart: () => void;
   onExit: () => void;
+  language?: Language;
 }
 
-export function PauseMenu({ onResume, onRestart, onExit }: PauseMenuProps) {
+export function PauseMenu({ onResume, onRestart, onExit, language = 'ru' }: PauseMenuProps) {
   return (
     <div className={styles.resultBackdrop} role="dialog" aria-modal="true">
       <section className={styles.pauseCard}>
-        <p className={styles.resultEyebrow}>Фокус сохранён</p>
-        <h2>Пауза</h2>
+        <p className={styles.resultEyebrow}>{t(language, 'pause.saved')}</p>
+        <h2>{t(language, 'game.pause')}</h2>
         <p className={styles.pauseDescription}>
-          Задача и все рабочие таймеры остановлены.
+          {t(language, 'pause.description')}
         </p>
         <div className={styles.pauseActions}>
           <button type="button" className={styles.primaryButton} onClick={onResume}>
-            Продолжить
+            {t(language, 'common.continue')}
           </button>
           <button type="button" className={styles.secondaryButton} onClick={onRestart}>
-            Начать заново
+            {t(language, 'pause.restart')}
           </button>
           <button type="button" className={styles.secondaryButton} onClick={onExit}>
-            Закончить рабочую неделю
+            {t(language, 'pause.exit')}
           </button>
         </div>
-        <p className={styles.pauseHint}>Esc — продолжить · R — начать заново</p>
+        <p className={styles.pauseHint}>{t(language, 'pause.hint')}</p>
       </section>
     </div>
   );

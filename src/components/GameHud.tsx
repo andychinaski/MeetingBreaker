@@ -1,5 +1,4 @@
 import { useEffect, useRef, useState } from 'react';
-import type Phaser from 'phaser';
 import { DEFAULT_LEVEL } from '../data/levels';
 import {
   GAME_COMMANDS,
@@ -13,6 +12,7 @@ import {
   type PauseChangedPayload,
   type PowerUpActivatedPayload,
   type ScoreChangedPayload,
+  type WaveChangedPayload,
 } from '../game/events/gameEvents';
 import { formatFreedTime } from '../game/systems/ScoreSystem';
 import type { GameState, LevelResult } from '../game/types/game';
@@ -22,12 +22,19 @@ import {
 } from './GameResultOverlay';
 import { PauseMenu } from './PauseMenu';
 import styles from './GameHud.module.css';
+import type { GameModeId } from '../game/types/mode';
+import type { Language } from '../services/storageService';
+import { t } from '../services/i18n';
+import { getHudConfig } from '../game/systems/hudConfig';
+import type { GameBridge } from './GameBridge';
 
 interface GameHudProps {
-  game: Phaser.Game;
+  bridge: GameBridge;
   onExitToMenu: () => void;
   onLevelResult: (result: LevelResult) => void;
   onNextLevel: () => void;
+  mode: GameModeId;
+  language: Language;
 }
 
 interface HudState {
@@ -40,6 +47,7 @@ interface HudState {
   initialCoffeeCups: number;
   activeBonus: string;
   coffeeEnabled: boolean;
+  wave: number;
 }
 
 interface ResultState {
@@ -55,26 +63,30 @@ const INITIAL_HUD_STATE: HudState = {
   multiplier: 1,
   coffeeCups: DEFAULT_LEVEL.initialCoffeeCups,
   initialCoffeeCups: DEFAULT_LEVEL.initialCoffeeCups,
-  activeBonus: 'Нет',
+  activeBonus: '',
   coffeeEnabled: true,
+  wave: 1,
 };
 
 export function GameHud({
-  game,
+  bridge,
   onExitToMenu,
   onLevelResult,
   onNextLevel,
+  mode,
+  language,
 }: GameHudProps) {
-  const [hud, setHud] = useState(INITIAL_HUD_STATE);
+  const hudConfig = getHudConfig(mode);
+  const [hud, setHud] = useState(() => ({ ...INITIAL_HUD_STATE, activeBonus: t(language, 'game.none') }));
   const [notice, setNotice] = useState<string | null>(null);
   const [resultState, setResultState] = useState<ResultState | null>(null);
   const [paused, setPaused] = useState(false);
   const noticeTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    const registryState = game.registry.get(
+    const registryState = bridge.getRegistry<GameState>(
       GAME_STATE_REGISTRY_KEY,
-    ) as GameState | undefined;
+    );
 
     if (registryState) {
       setHud((current) => ({
@@ -90,8 +102,9 @@ export function GameHud({
         ...payload.score,
         coffeeCups: payload.coffeeCups,
         initialCoffeeCups: payload.initialCoffeeCups,
-        activeBonus: 'Нет',
+        activeBonus: t(language, 'game.none'),
         coffeeEnabled: payload.coffeeEnabled ?? true,
+        wave: payload.wave,
       });
       setNotice(null);
       setResultState(null);
@@ -123,6 +136,7 @@ export function GameHud({
     const handlePause = (payload: PauseChangedPayload) => {
       setPaused(payload.paused);
     };
+    const handleWave = (payload: WaveChangedPayload) => setHud((current) => ({ ...current, wave: payload.wave }));
     const handleVictory = (payload: LevelCompletedPayload) => {
       setResultState({ outcome: 'victory', result: payload.result });
       onLevelResult(payload.result);
@@ -132,68 +146,70 @@ export function GameHud({
       onLevelResult(payload.result);
     };
 
-    game.events.on(GAME_EVENTS.GAME_STARTED, handleStarted);
-    game.events.on(GAME_EVENTS.SCORE_CHANGED, handleScore);
-    game.events.on(GAME_EVENTS.COFFEE_CHANGED, handleCoffee);
-    game.events.on(GAME_EVENTS.COFFEE_CONSUMED, handleCoffeeConsumed);
-    game.events.on(GAME_EVENTS.POWER_UP_ACTIVATED, handlePowerUp);
-    game.events.on(GAME_EVENTS.PAUSE_CHANGED, handlePause);
-    game.events.on(GAME_EVENTS.LEVEL_COMPLETED, handleVictory);
-    game.events.on(GAME_EVENTS.GAME_OVER, handleDefeat);
+    bridge.on(GAME_EVENTS.GAME_STARTED, handleStarted);
+    bridge.on(GAME_EVENTS.SCORE_CHANGED, handleScore);
+    bridge.on(GAME_EVENTS.COFFEE_CHANGED, handleCoffee);
+    bridge.on(GAME_EVENTS.COFFEE_CONSUMED, handleCoffeeConsumed);
+    bridge.on(GAME_EVENTS.POWER_UP_ACTIVATED, handlePowerUp);
+    bridge.on(GAME_EVENTS.PAUSE_CHANGED, handlePause);
+    bridge.on(GAME_EVENTS.LEVEL_COMPLETED, handleVictory);
+    bridge.on(GAME_EVENTS.GAME_OVER, handleDefeat);
+    bridge.on(GAME_EVENTS.WAVE_CHANGED, handleWave);
 
     return () => {
-      game.events.off(GAME_EVENTS.GAME_STARTED, handleStarted);
-      game.events.off(GAME_EVENTS.SCORE_CHANGED, handleScore);
-      game.events.off(GAME_EVENTS.COFFEE_CHANGED, handleCoffee);
-      game.events.off(GAME_EVENTS.COFFEE_CONSUMED, handleCoffeeConsumed);
-      game.events.off(GAME_EVENTS.POWER_UP_ACTIVATED, handlePowerUp);
-      game.events.off(GAME_EVENTS.PAUSE_CHANGED, handlePause);
-      game.events.off(GAME_EVENTS.LEVEL_COMPLETED, handleVictory);
-      game.events.off(GAME_EVENTS.GAME_OVER, handleDefeat);
+      bridge.off(GAME_EVENTS.GAME_STARTED, handleStarted);
+      bridge.off(GAME_EVENTS.SCORE_CHANGED, handleScore);
+      bridge.off(GAME_EVENTS.COFFEE_CHANGED, handleCoffee);
+      bridge.off(GAME_EVENTS.COFFEE_CONSUMED, handleCoffeeConsumed);
+      bridge.off(GAME_EVENTS.POWER_UP_ACTIVATED, handlePowerUp);
+      bridge.off(GAME_EVENTS.PAUSE_CHANGED, handlePause);
+      bridge.off(GAME_EVENTS.LEVEL_COMPLETED, handleVictory);
+      bridge.off(GAME_EVENTS.GAME_OVER, handleDefeat);
+      bridge.off(GAME_EVENTS.WAVE_CHANGED, handleWave);
 
       if (noticeTimer.current) {
         clearTimeout(noticeTimer.current);
       }
     };
-  }, [game, onLevelResult]);
+  }, [bridge, language, onLevelResult]);
 
   const restartLevel = () => {
-    game.events.emit(GAME_COMMANDS.RESTART_LEVEL);
+    bridge.emit(GAME_COMMANDS.RESTART_LEVEL);
   };
 
   const togglePause = () => {
-    game.events.emit(GAME_COMMANDS.TOGGLE_PAUSE);
+    bridge.emit(GAME_COMMANDS.TOGGLE_PAUSE);
   };
 
   return (
     <>
-      <aside className={styles.hud} aria-label="Игровая статистика">
+      <aside className={styles.hud} aria-label={t(language, 'game.statsAria')}>
         <div className={styles.levelChip}>
-          <span>Уровень</span>
-          <strong>{hud.levelTitle}</strong>
+          <span>{t(language, hudConfig.context === 'level' ? 'game.level' : 'game.wave')}</span>
+          <strong>{hudConfig.context === 'level' ? hud.levelTitle : hud.wave}</strong>
         </div>
         <div className={styles.statChip}>
-          <span>Очки</span>
-          <strong>{hud.score.toLocaleString('ru-RU')}</strong>
+          <span>{t(language, 'game.score')}</span>
+          <strong>{hud.score.toLocaleString(language === 'ru' ? 'ru-RU' : 'en-US')}</strong>
         </div>
         <div className={styles.statChip}>
-          <span>Свободно</span>
-          <strong>{formatFreedTime(hud.freedMinutes)}</strong>
+          <span>{t(language, 'game.freedTime')}</span>
+          <strong>{formatFreedTime(hud.freedMinutes, language)}</strong>
         </div>
         <div className={styles.statChip}>
-          <span>Комбо</span>
+          <span>{t(language, 'game.combo')}</span>
           <strong>
             ×{hud.combo} · {hud.multiplier.toFixed(2)}
           </strong>
         </div>
-        {hud.coffeeEnabled && <div className={styles.statChip}>
-          <span>Кофе</span>
-          <strong aria-label={`${hud.coffeeCups} чашки кофе`}>
+        {hudConfig.showCoffee && hud.coffeeEnabled && <div className={styles.statChip}>
+          <span>{t(language, 'game.coffee')}</span>
+          <strong aria-label={`${t(language, 'game.coffee')}: ${hud.coffeeCups}`}>
             {hud.coffeeCups > 0 ? '☕'.repeat(hud.coffeeCups) : '—'}
           </strong>
         </div>}
         <div className={styles.statChip}>
-          <span>Бонус</span>
+          <span>{t(language, 'game.bonus')}</span>
           <strong>{hud.activeBonus}</strong>
         </div>
         <button
@@ -201,7 +217,7 @@ export function GameHud({
           className={styles.pauseButton}
           onClick={togglePause}
         >
-          {paused ? 'Продолжить' : 'Пауза'}
+          {t(language, paused ? 'common.continue' : 'game.pause')}
         </button>
       </aside>
 
@@ -218,6 +234,7 @@ export function GameHud({
           onRestart={restartLevel}
           onExit={onExitToMenu}
           onNextLevel={onNextLevel}
+          language={language}
         />
       )}
 
@@ -226,6 +243,7 @@ export function GameHud({
           onResume={togglePause}
           onRestart={restartLevel}
           onExit={onExitToMenu}
+          language={language}
         />
       )}
     </>

@@ -13,7 +13,7 @@
 }
 
 .gameShell {
-  width: min(1180px, calc(100% - 24px), calc((100vh - 150px) * 1.7778));
+  width: min(1180px, calc(100% - 24px), calc((100vh - 250px) * 1.7778));
   padding: 12px 0;
   gap: 12px;
 }
